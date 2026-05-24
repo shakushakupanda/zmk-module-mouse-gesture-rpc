@@ -1,0 +1,32 @@
+config ZMK_MOUSE_GESTURE_RPC
+    bool "Enable runtime-configurable mouse gesture (via custom Studio RPC)"
+    depends on ZMK_STUDIO
+    help
+      Provides a Custom Studio RPC subsystem (identifier: "cormoran_mg")
+      that lets DYA Studio enumerate, add, edit, and delete mouse-gesture
+      patterns and tweak runtime parameters (stroke size, idle timeout,
+      cooldown, etc.) without rebuilding firmware.
+
+      The static kot149/zmk-mouse-gesture devicetree configuration is still
+      used as the initial default set of gestures. Changes made via Studio
+      are stored in non-volatile settings and persist across reboots.
+
+if ZMK_MOUSE_GESTURE_RPC
+
+config ZMK_MOUSE_GESTURE_RPC_LOG_LEVEL
+    int "Log level for the mouse-gesture RPC handler"
+    default 2
+    range 0 4
+    help
+      0=off, 1=err, 2=warn, 3=info, 4=dbg
+
+config ZMK_MOUSE_GESTURE_RPC_MAX_GESTURES
+    int "Maximum number of stored gestures"
+    default 32
+    range 1 32
+    help
+      Hard upper bound on how many gestures the runtime store can hold.
+      Must not exceed the value declared for ListGesturesResponse.gestures
+      in proto/zmk/mouse_gesture/custom.options.
+
+endif
