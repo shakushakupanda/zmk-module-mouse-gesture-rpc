@@ -1,0 +1,17 @@
+:root {
+  --bg: #0f1419;
+  --bg-elev: #1a2028;
+  --border: #2a3340;
+  --text: #e8eef5;
+  --text-muted: #8a9aaa;
+  --accent: #7ee0c1;
+  --accent-2: #8aa2ff;
+  --danger: #ff6b6b;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); }
+button { font-family: inherit; cursor: pointer; }
+input, select, textarea { font-family: inherit; }
