@@ -1,0 +1,113 @@
+/*
+ * zmk-module-mouse-gesture-rpc — Custom Studio RPC protocol
+ *
+ * Defines RPC messages that DYA Studio uses to manage mouse-gesture
+ * patterns and runtime settings on the keyboard firmware.
+ */
+
+syntax = "proto3";
+
+package zmk.mouse_gesture;
+
+// === Data types ===
+
+enum Direction {
+    DIRECTION_UP = 0;
+    DIRECTION_RIGHT = 1;
+    DIRECTION_DOWN = 2;
+    DIRECTION_LEFT = 3;
+}
+
+// A gesture pattern is a sequence of directions (e.g. DOWN, RIGHT for "close tab")
+message GesturePattern {
+    repeated Direction directions = 1;  // max_count: 8 (see custom.options)
+}
+
+// A behavior binding to invoke when a gesture is matched.
+// Mirrors the DTS form: <&kp LC(W)> -> behavior="kp", param1=LC(W), param2=0
+message Binding {
+    string behavior = 1;   // ZMK behavior name without '&' prefix, e.g. "kp", "mkp", "macro_0"
+    uint32 param1 = 2;
+    uint32 param2 = 3;
+}
+
+message Gesture {
+    uint32 id = 1;                    // sequence id assigned by firmware
+    string name = 2;                  // human-readable name e.g. "close_tab"
+    GesturePattern pattern = 3;
+    Binding binding = 4;
+    bool enabled = 5;
+}
+
+message Settings {
+    uint32 stroke_size = 1;            // pixels per stroke (default 200)
+    uint32 idle_timeout_ms = 2;        // ms before bindings invoke (default 150)
+    uint32 gesture_cooldown_ms = 3;    // ms after a gesture, suppress further (default 500)
+    uint32 movement_threshold = 4;     // ignore deltas below this (default 0)
+    bool enable_eager_mode = 5;        // invoke on match without waiting for idle
+    bool always_active = 6;            // skip activation-key gating
+}
+
+// === Requests ===
+
+message ListGesturesRequest {}
+message GetGestureRequest { uint32 id = 1; }
+message AddGestureRequest { Gesture gesture = 1; }
+message UpdateGestureRequest { Gesture gesture = 1; }
+message DeleteGestureRequest { uint32 id = 1; }
+message ResetToDefaultsRequest {}
+
+message GetSettingsRequest {}
+message SetSettingsRequest { Settings settings = 1; }
+
+// === Responses ===
+
+message ListGesturesResponse {
+    repeated Gesture gestures = 1;  // max_count: 32 (see custom.options)
+}
+
+message GestureResponse { Gesture gesture = 1; }
+message GetSettingsResponse { Settings settings = 1; }
+message Empty {}
+
+message ErrorResponse {
+    string message = 1;
+}
+
+// === Top-level wrappers ===
+
+message Request {
+    oneof request_type {
+        ListGesturesRequest list_gestures = 1;
+        GetGestureRequest get_gesture = 2;
+        AddGestureRequest add_gesture = 3;
+        UpdateGestureRequest update_gesture = 4;
+        DeleteGestureRequest delete_gesture = 5;
+        ResetToDefaultsRequest reset_to_defaults = 6;
+        GetSettingsRequest get_settings = 7;
+        SetSettingsRequest set_settings = 8;
+    }
+}
+
+message Response {
+    oneof response_type {
+        ErrorResponse error = 1;
+        ListGesturesResponse list_gestures = 2;
+        GestureResponse gesture = 3;
+        Empty empty = 4;
+        GetSettingsResponse settings = 5;
+    }
+}
+
+// === Notifications (firmware -> studio push, future use) ===
+
+message GestureChangedNotification {
+    enum ChangeType {
+        ADDED = 0;
+        UPDATED = 1;
+        DELETED = 2;
+    }
+    ChangeType type = 1;
+    Gesture gesture = 2;       // when ADDED/UPDATED
+    uint32 deleted_id = 3;     // when DELETED
+}
