@@ -1,0 +1,320 @@
+/*
+ * Runtime gesture store — Phase 3 implementation.
+ *
+ * Layout:
+ *   - mg_store_init() loads from Zephyr settings (key prefix "cmg/").
+ *     If no saved data, seeds from DTS defaults (extracted via the same
+ *     DT macros that the firmware's compile-time trie uses, so the seed
+ *     matches what kot149 actually matches today).
+ *   - Mutations call save() which writes the whole array as one blob.
+ *     Simpler than per-slot keys; the blob is at most ~6KB.
+ */
+
+#include "gesture_store.h"
+
+#include <errno.h>
+#include <string.h>
+
+#include <zephyr/devicetree.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/sys/util_macro.h>
+#include <zephyr/settings/settings.h>
+#include <zephyr/device.h>
+
+#include <zephyr/logging/log.h>
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+/* === Runtime array =================================================== */
+
+static struct mg_gesture g_store[MG_MAX_GESTURES];
+static size_t            g_count;
+static uint32_t          g_next_id = 1;
+static bool              g_loaded;
+
+/* === DTS defaults extraction (mirrors handler.c phase-2 walk) ======= */
+
+#define MG_COMPAT zmk_input_processor_mouse_gesture
+#define MG_NODE   DT_COMPAT_GET_ANY_STATUS_OKAY(MG_COMPAT)
+
+/* kot149 GESTURE_* bitmask values. */
+#define KOT_GESTURE_UP    1
+#define KOT_GESTURE_DOWN  2
+#define KOT_GESTURE_LEFT  4
+#define KOT_GESTURE_RIGHT 8
+
+static inline uint8_t kot_to_proto_direction(uint8_t d) {
+    switch (d) {
+    case KOT_GESTURE_UP:    return 0;
+    case KOT_GESTURE_RIGHT: return 1;
+    case KOT_GESTURE_DOWN:  return 2;
+    case KOT_GESTURE_LEFT:  return 3;
+    default:                return 0;
+    }
+}
+
+#if DT_NODE_EXISTS(MG_NODE)
+
+struct mg_dts_default {
+    const char    *name;
+    const uint8_t *pattern;
+    size_t         pattern_len;
+    const char    *binding_behavior;
+    uint32_t       binding_param1;
+    uint32_t       binding_param2;
+};
+
+#define APPEND_PATTERN_BYTE(node_id, prop, idx) DT_PROP_BY_IDX(node_id, prop, idx),
+
+#define BINDING_BEHAVIOR(child)                                                                    \
+    COND_CODE_1(DT_NODE_HAS_PROP(child, bindings),                                                 \
+                (DEVICE_DT_NAME(DT_PHANDLE_BY_IDX(child, bindings, 0))),                           \
+                (""))
+
+#define BINDING_PARAM(child, name)                                                                 \
+    COND_CODE_1(DT_NODE_HAS_PROP(child, bindings),                                                 \
+                (COND_CODE_1(DT_PHA_HAS_CELL_AT_IDX(child, bindings, 0, name),                     \
+                             (DT_PHA_BY_IDX(child, bindings, 0, name)),                            \
+                             (0))),                                                                \
+                (0))
+
+#define MAKE_DEFAULT_ENTRY(child)                                                                  \
+    {                                                                                              \
+        .name = DT_NODE_FULL_NAME(child),                                                          \
+        .pattern = (const uint8_t[]){                                                              \
+            DT_FOREACH_PROP_ELEM(child, pattern, APPEND_PATTERN_BYTE) 0},                          \
+        .pattern_len      = DT_PROP_LEN(child, pattern),                                           \
+        .binding_behavior = BINDING_BEHAVIOR(child),                                               \
+        .binding_param1   = BINDING_PARAM(child, param1),                                          \
+        .binding_param2   = BINDING_PARAM(child, param2),                                          \
+    },
+
+static const struct mg_dts_default g_dts_defaults[] = {
+    DT_FOREACH_CHILD(MG_NODE, MAKE_DEFAULT_ENTRY)
+};
+#define NUM_DTS_DEFAULTS ARRAY_SIZE(g_dts_defaults)
+
+#else
+static const struct mg_dts_default g_dts_defaults[1] = {{0}};
+#define NUM_DTS_DEFAULTS 0
+#endif
+
+/* === Internal helpers ================================================ */
+
+static void seed_from_dts(void) {
+    memset(g_store, 0, sizeof(g_store));
+    g_count   = 0;
+    g_next_id = 1;
+
+    size_t n = NUM_DTS_DEFAULTS;
+    if (n > MG_MAX_GESTURES) n = MG_MAX_GESTURES;
+
+    for (size_t i = 0; i < n; i++) {
+        const struct mg_dts_default *d = &g_dts_defaults[i];
+        struct mg_gesture *g = &g_store[i];
+
+        g->in_use  = true;
+        g->enabled = true;
+        g->id      = g_next_id++;
+        if (d->name) strncpy(g->name, d->name, sizeof(g->name) - 1);
+        if (d->binding_behavior) {
+            strncpy(g->binding_behavior, d->binding_behavior,
+                    sizeof(g->binding_behavior) - 1);
+        }
+
+        size_t plen = d->pattern_len;
+        if (plen > MG_PATTERN_MAX) plen = MG_PATTERN_MAX;
+        g->pattern_len = plen;
+        for (size_t j = 0; j < plen; j++) {
+            g->pattern[j] = kot_to_proto_direction(d->pattern[j]);
+        }
+        g->binding_param1 = d->binding_param1;
+        g->binding_param2 = d->binding_param2;
+    }
+    g_count = n;
+}
+
+/* Persist the whole store to settings. */
+static int store_save(void) {
+    int rc;
+    /* The blob: [count:4][next_id:4][gestures...] */
+    uint32_t hdr[2] = {(uint32_t)g_count, g_next_id};
+    rc = settings_save_one("cmg/hdr", hdr, sizeof(hdr));
+    if (rc) {
+        LOG_WRN("mg_store: save hdr failed: %d", rc);
+        return rc;
+    }
+    rc = settings_save_one("cmg/data", g_store,
+                           sizeof(struct mg_gesture) * MG_MAX_GESTURES);
+    if (rc) {
+        LOG_WRN("mg_store: save data failed: %d", rc);
+        return rc;
+    }
+    return 0;
+}
+
+/* Zephyr settings load handler. */
+static int store_set_cb(const char *name, size_t len, settings_read_cb read_cb,
+                        void *cb_arg) {
+    if (strcmp(name, "hdr") == 0) {
+        uint32_t hdr[2] = {0};
+        ssize_t got = read_cb(cb_arg, hdr, MIN(sizeof(hdr), len));
+        if (got > 0) {
+            g_count   = hdr[0];
+            if (g_count > MG_MAX_GESTURES) g_count = MG_MAX_GESTURES;
+            g_next_id = hdr[1];
+            if (g_next_id == 0) g_next_id = 1;
+            g_loaded = true;
+        }
+        return 0;
+    }
+    if (strcmp(name, "data") == 0) {
+        ssize_t got = read_cb(cb_arg, g_store,
+                              MIN(sizeof(g_store), len));
+        if (got > 0) {
+            g_loaded = true;
+        }
+        return 0;
+    }
+    return 0;
+}
+
+SETTINGS_STATIC_HANDLER_DEFINE(mg_store, "cmg", NULL, store_set_cb, NULL, NULL);
+
+/* Validate gesture and copy into a slot. */
+static int copy_into_slot(struct mg_gesture *slot,
+                          const struct mg_gesture *src,
+                          uint32_t id) {
+    if (src->pattern_len == 0 || src->pattern_len > MG_PATTERN_MAX) {
+        return -EINVAL;
+    }
+    memset(slot, 0, sizeof(*slot));
+    slot->in_use      = true;
+    slot->enabled     = src->enabled;
+    slot->id          = id;
+    slot->pattern_len = src->pattern_len;
+    memcpy(slot->pattern, src->pattern, src->pattern_len);
+    slot->binding_param1 = src->binding_param1;
+    slot->binding_param2 = src->binding_param2;
+    strncpy(slot->name, src->name, sizeof(slot->name) - 1);
+    strncpy(slot->binding_behavior, src->binding_behavior,
+            sizeof(slot->binding_behavior) - 1);
+    return 0;
+}
+
+static struct mg_gesture *find_slot_by_id_mut(uint32_t id) {
+    for (size_t i = 0; i < MG_MAX_GESTURES; i++) {
+        if (g_store[i].in_use && g_store[i].id == id) {
+            return &g_store[i];
+        }
+    }
+    return NULL;
+}
+
+static int find_free_slot_index(void) {
+    for (size_t i = 0; i < MG_MAX_GESTURES; i++) {
+        if (!g_store[i].in_use) return (int)i;
+    }
+    return -1;
+}
+
+static void recount(void) {
+    size_t c = 0;
+    for (size_t i = 0; i < MG_MAX_GESTURES; i++) {
+        if (g_store[i].in_use) c++;
+    }
+    g_count = c;
+}
+
+/* Compact: move in_use entries to the front so iteration is contiguous. */
+static void compact(void) {
+    size_t dst = 0;
+    for (size_t src = 0; src < MG_MAX_GESTURES; src++) {
+        if (g_store[src].in_use) {
+            if (src != dst) {
+                g_store[dst] = g_store[src];
+                memset(&g_store[src], 0, sizeof(g_store[src]));
+            }
+            dst++;
+        }
+    }
+    g_count = dst;
+}
+
+/* === Public API ====================================================== */
+
+int mg_store_init(void) {
+    int rc = settings_subsys_init();
+    if (rc) {
+        LOG_WRN("mg_store: settings_subsys_init failed: %d", rc);
+    }
+
+    g_loaded = false;
+    memset(g_store, 0, sizeof(g_store));
+    g_count   = 0;
+    g_next_id = 1;
+
+    (void)settings_load_subtree("cmg");
+
+    if (!g_loaded || g_count == 0) {
+        LOG_INF("mg_store: no saved data, seeding from DTS defaults (n=%u)",
+                (unsigned)NUM_DTS_DEFAULTS);
+        seed_from_dts();
+        store_save();
+    } else {
+        recount();
+        LOG_INF("mg_store: loaded %u gestures from NVS", (unsigned)g_count);
+    }
+    return 0;
+}
+
+size_t mg_store_count(void) { return g_count; }
+
+const struct mg_gesture *mg_store_at(size_t idx) {
+    size_t seen = 0;
+    for (size_t i = 0; i < MG_MAX_GESTURES; i++) {
+        if (!g_store[i].in_use) continue;
+        if (seen == idx) return &g_store[i];
+        seen++;
+    }
+    return NULL;
+}
+
+const struct mg_gesture *mg_store_find(uint32_t id) {
+    return find_slot_by_id_mut(id);
+}
+
+int mg_store_add(const struct mg_gesture *g, uint32_t *out_id) {
+    int slot = find_free_slot_index();
+    if (slot < 0) return -ENOSPC;
+    uint32_t id = g_next_id++;
+    int rc = copy_into_slot(&g_store[slot], g, id);
+    if (rc) {
+        g_next_id--;
+        return rc;
+    }
+    g_count++;
+    if (out_id) *out_id = id;
+    return store_save();
+}
+
+int mg_store_update(const struct mg_gesture *g) {
+    struct mg_gesture *slot = find_slot_by_id_mut(g->id);
+    if (!slot) return -ENOENT;
+    uint32_t keep_id = slot->id;
+    int rc = copy_into_slot(slot, g, keep_id);
+    if (rc) return rc;
+    return store_save();
+}
+
+int mg_store_delete(uint32_t id) {
+    struct mg_gesture *slot = find_slot_by_id_mut(id);
+    if (!slot) return -ENOENT;
+    memset(slot, 0, sizeof(*slot));
+    compact();
+    return store_save();
+}
+
+int mg_store_reset_to_defaults(void) {
+    seed_from_dts();
+    return store_save();
+}
