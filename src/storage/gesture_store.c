@@ -31,6 +31,16 @@ static size_t            g_count;
 static uint32_t          g_next_id = 1;
 static bool              g_loaded;
 
+/* Settings (Phase 4). Defaults match kot149/zmk-mouse-gesture library defaults. */
+static struct mg_settings g_settings = {
+    .stroke_size         = 200,
+    .idle_timeout_ms     = 150,
+    .gesture_cooldown_ms = 500,
+    .movement_threshold  = 0,
+    .enable_eager_mode   = false,
+    .always_active       = false,
+};
+
 /* === DTS defaults extraction (mirrors handler.c phase-2 walk) ======= */
 
 #define MG_COMPAT zmk_input_processor_mouse_gesture
@@ -176,6 +186,11 @@ static int store_set_cb(const char *name, size_t len, settings_read_cb read_cb,
         }
         return 0;
     }
+    if (strcmp(name, "settings") == 0) {
+        (void)read_cb(cb_arg, &g_settings,
+                      MIN(sizeof(g_settings), len));
+        return 0;
+    }
     return 0;
 }
 
@@ -318,4 +333,20 @@ int mg_store_delete(uint32_t id) {
 int mg_store_reset_to_defaults(void) {
     seed_from_dts();
     return store_save();
+}
+
+/* === Settings (Phase 4) ============================================== */
+
+void mg_settings_get(struct mg_settings *out) {
+    if (out) *out = g_settings;
+}
+
+int mg_settings_set(const struct mg_settings *s) {
+    if (!s) return -EINVAL;
+    g_settings = *s;
+    int rc = settings_save_one("cmg/settings", &g_settings, sizeof(g_settings));
+    if (rc) {
+        LOG_WRN("mg_store: save settings failed: %d", rc);
+    }
+    return rc;
 }
