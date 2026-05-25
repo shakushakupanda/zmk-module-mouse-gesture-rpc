@@ -24,7 +24,8 @@ static struct zmk_rpc_custom_subsystem_meta mouse_gesture_meta = {
      * the published Web UI URL (GitHub Pages / Cloudflare Pages) once the
      * web/ frontend is deployed.
      */
-    ZMK_RPC_CUSTOM_SUBSYSTEM_UI_URLS("http://localhost:5173"),
+    ZMK_RPC_CUSTOM_SUBSYSTEM_UI_URLS(
+        "https://shakushakupanda.github.io/zmk-module-mouse-gesture-rpc/"),
     .security = ZMK_STUDIO_RPC_HANDLER_UNSECURED,
 };
 
