@@ -52,8 +52,7 @@ static inline uint8_t kot_to_proto_direction(uint8_t d) {
     }
 }
 
-#if DT_NODE_EXISTS(MG_NODE)
-
+/* Always-visible struct so the #else branch compiles too. */
 struct mg_dts_default {
     const char    *name;
     const uint8_t *pattern;
@@ -62,6 +61,8 @@ struct mg_dts_default {
     uint32_t       binding_param1;
     uint32_t       binding_param2;
 };
+
+#if DT_NODE_EXISTS(MG_NODE)
 
 #define APPEND_PATTERN_BYTE(node_id, prop, idx) DT_PROP_BY_IDX(node_id, prop, idx),
 
