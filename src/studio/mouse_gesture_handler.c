@@ -243,15 +243,18 @@ static int handle_get_settings(
     const zmk_mouse_gesture_GetSettingsRequest *req,
     zmk_mouse_gesture_Response *resp) {
     (void)req;
+    struct mg_settings cur;
+    mg_settings_get(&cur);
+
     zmk_mouse_gesture_GetSettingsResponse out =
         zmk_mouse_gesture_GetSettingsResponse_init_zero;
     out.has_settings = true;
-    out.settings.stroke_size         = 200;
-    out.settings.idle_timeout_ms     = 150;
-    out.settings.gesture_cooldown_ms = 500;
-    out.settings.movement_threshold  = 0;
-    out.settings.enable_eager_mode   = false;
-    out.settings.always_active       = false;
+    out.settings.stroke_size         = cur.stroke_size;
+    out.settings.idle_timeout_ms     = cur.idle_timeout_ms;
+    out.settings.gesture_cooldown_ms = cur.gesture_cooldown_ms;
+    out.settings.movement_threshold  = cur.movement_threshold;
+    out.settings.enable_eager_mode   = cur.enable_eager_mode;
+    out.settings.always_active       = cur.always_active;
     resp->which_response_type = zmk_mouse_gesture_Response_settings_tag;
     resp->response_type.settings = out;
     return 0;
@@ -260,9 +263,25 @@ static int handle_get_settings(
 static int handle_set_settings(
     const zmk_mouse_gesture_SetSettingsRequest *req,
     zmk_mouse_gesture_Response *resp) {
-    (void)req;
-    set_error(resp, "set_settings: Phase 4");
-    return 0;
+    if (!req->has_settings) {
+        set_error(resp, "set_settings: missing settings");
+        return 0;
+    }
+    struct mg_settings ns = {
+        .stroke_size         = req->settings.stroke_size,
+        .idle_timeout_ms     = req->settings.idle_timeout_ms,
+        .gesture_cooldown_ms = req->settings.gesture_cooldown_ms,
+        .movement_threshold  = req->settings.movement_threshold,
+        .enable_eager_mode   = req->settings.enable_eager_mode,
+        .always_active       = req->settings.always_active,
+    };
+    int rc = mg_settings_set(&ns);
+    if (rc) {
+        set_error(resp, "set_settings failed");
+        return 0;
+    }
+    /* Echo current settings back. */
+    return handle_get_settings(NULL, resp);
 }
 
 /* === Dispatcher ======================================================== */
