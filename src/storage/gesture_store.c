@@ -370,7 +370,7 @@ int mg_store_add(const struct mg_gesture *g, uint32_t *out_id) {
     }
     g_count++;
     if (out_id) *out_id = id;
-    int rc = store_save();
+    rc = store_save();
     sync_to_kot149();
     return rc;
 }
