@@ -21,6 +21,8 @@
 #include <zephyr/settings/settings.h>
 #include <zephyr/device.h>
 
+#include <zmk/mouse_gesture/runtime.h>
+
 #include <zephyr/logging/log.h>
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -40,6 +42,62 @@ static struct mg_settings g_settings = {
     .enable_eager_mode   = false,
     .always_active       = false,
 };
+
+/* === Phase 5: kot149 trie sync storage =================================
+ * These arrays back the runtime gesture set we push to kot149's input
+ * processor. The driver retains pointers into them via its trie nodes,
+ * so they must outlive the trie (static storage = program lifetime).
+ */
+static struct gesture_pattern         g_kot_patterns[MG_MAX_GESTURES];
+static uint8_t                        g_kot_pattern_bytes[MG_MAX_GESTURES][MG_PATTERN_MAX];
+static struct zmk_behavior_binding    g_kot_bindings[MG_MAX_GESTURES][1];
+
+/* Proto Direction (UP=0, RIGHT=1, DOWN=2, LEFT=3) -> kot149 GESTURE_*
+ * bitmask (UP=1, DOWN=2, LEFT=4, RIGHT=8). */
+static uint8_t proto_to_kot_direction(uint8_t d) {
+    switch (d) {
+    case 0: return 1; /* UP */
+    case 1: return 8; /* RIGHT */
+    case 2: return 2; /* DOWN */
+    case 3: return 4; /* LEFT */
+    default: return 1;
+    }
+}
+
+static int sync_to_kot149(void) {
+    size_t n = 0;
+    for (size_t i = 0; i < MG_MAX_GESTURES && n < MG_MAX_GESTURES; i++) {
+        if (!g_store[i].in_use || !g_store[i].enabled) continue;
+        if (g_store[i].pattern_len == 0) continue;
+
+        size_t plen = g_store[i].pattern_len;
+        if (plen > MG_PATTERN_MAX) plen = MG_PATTERN_MAX;
+        for (size_t j = 0; j < plen; j++) {
+            g_kot_pattern_bytes[n][j] = proto_to_kot_direction(g_store[i].pattern[j]);
+        }
+
+        g_kot_bindings[n][0].behavior_dev = g_store[i].binding_behavior;
+        g_kot_bindings[n][0].param1       = g_store[i].binding_param1;
+        g_kot_bindings[n][0].param2       = g_store[i].binding_param2;
+
+        g_kot_patterns[n] = (struct gesture_pattern){
+            .bindings_len = 1,
+            .bindings     = g_kot_bindings[n],
+            .pattern_len  = plen,
+            .wait_ms      = 0,
+            .tap_ms       = 0,
+            .pattern      = g_kot_pattern_bytes[n],
+        };
+        n++;
+    }
+    int rc = zmk_mouse_gesture_runtime_set(g_kot_patterns, n);
+    if (rc) {
+        LOG_WRN("mg_store: sync_to_kot149 failed: %d (n=%u)", rc, (unsigned)n);
+    } else {
+        LOG_INF("mg_store: synced %u gestures to kot149 trie", (unsigned)n);
+    }
+    return rc;
+}
 
 /* === DTS defaults extraction (mirrors handler.c phase-2 walk) ======= */
 
@@ -280,6 +338,8 @@ int mg_store_init(void) {
         recount();
         LOG_INF("mg_store: loaded %u gestures from NVS", (unsigned)g_count);
     }
+    /* Push the loaded/seeded store to kot149's runtime trie. */
+    sync_to_kot149();
     return 0;
 }
 
@@ -310,7 +370,9 @@ int mg_store_add(const struct mg_gesture *g, uint32_t *out_id) {
     }
     g_count++;
     if (out_id) *out_id = id;
-    return store_save();
+    int rc = store_save();
+    sync_to_kot149();
+    return rc;
 }
 
 int mg_store_update(const struct mg_gesture *g) {
@@ -319,7 +381,9 @@ int mg_store_update(const struct mg_gesture *g) {
     uint32_t keep_id = slot->id;
     int rc = copy_into_slot(slot, g, keep_id);
     if (rc) return rc;
-    return store_save();
+    rc = store_save();
+    sync_to_kot149();
+    return rc;
 }
 
 int mg_store_delete(uint32_t id) {
@@ -327,12 +391,16 @@ int mg_store_delete(uint32_t id) {
     if (!slot) return -ENOENT;
     memset(slot, 0, sizeof(*slot));
     compact();
-    return store_save();
+    int rc = store_save();
+    sync_to_kot149();
+    return rc;
 }
 
 int mg_store_reset_to_defaults(void) {
     seed_from_dts();
-    return store_save();
+    int rc = store_save();
+    sync_to_kot149();
+    return rc;
 }
 
 /* === Settings (Phase 4) ============================================== */
