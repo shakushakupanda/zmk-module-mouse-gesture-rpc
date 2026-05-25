@@ -70,4 +70,21 @@ int mg_store_delete(uint32_t id);
 /* Wipe the store and re-seed from DTS defaults. */
 int mg_store_reset_to_defaults(void);
 
+/* === Settings (Phase 4) ============================================== */
+
+struct mg_settings {
+    uint32_t stroke_size;         /* pixels per stroke (default 200) */
+    uint32_t idle_timeout_ms;     /* idle delay before fire (default 150) */
+    uint32_t gesture_cooldown_ms; /* suppress further gestures (default 500) */
+    uint32_t movement_threshold;  /* ignore deltas below this (default 0) */
+    bool     enable_eager_mode;
+    bool     always_active;
+};
+
+/* Read the current settings (post-NVS-load) into *out. */
+void mg_settings_get(struct mg_settings *out);
+
+/* Replace settings + persist. Returns 0 on success. */
+int mg_settings_set(const struct mg_settings *s);
+
 #endif /* MG_GESTURE_STORE_H */
