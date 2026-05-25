@@ -1,6 +1,10 @@
 config ZMK_MOUSE_GESTURE_RPC
     bool "Enable runtime-configurable mouse gesture (via custom Studio RPC)"
     depends on ZMK_STUDIO
+    select SETTINGS
+    select NVS
+    select FLASH
+    select FLASH_MAP
     help
       Provides a Custom Studio RPC subsystem (identifier: "cormoran_mg")
       that lets DYA Studio enumerate, add, edit, and delete mouse-gesture
