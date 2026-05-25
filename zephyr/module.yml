@@ -2,5 +2,5 @@ name: zmk-module-mouse-gesture-rpc
 build:
   cmake: .
   kconfig: Kconfig
-settings:
-  dts_root: .
+  settings:
+    dts_root: .
