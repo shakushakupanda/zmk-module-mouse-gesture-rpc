@@ -392,7 +392,7 @@ int mg_store_delete(uint32_t id) {
     memset(slot, 0, sizeof(*slot));
     compact();
     int rc = store_save();
-    sync_to_kot149();
+    /* sync_to_kot149(); */
     return rc;
 }
 
