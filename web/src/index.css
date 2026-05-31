@@ -1,17 +1,74 @@
 :root {
-  --bg: #0f1419;
-  --bg-elev: #1a2028;
-  --border: #2a3340;
-  --text: #e8eef5;
-  --text-muted: #8a9aaa;
-  --accent: #7ee0c1;
-  --accent-2: #8aa2ff;
-  --danger: #ff6b6b;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  color-scheme: dark;
+    /* DYA Studio-inspired pastel light palette */
+    --color-bg: #f6f8fb;
+    --color-bg-elev: #ffffff;
+    --color-bg-soft: #f0f3f8;
+    --color-border: #e4e8ee;
+    --color-border-strong: #d6dce4;
+    --color-text: #1f2937;
+    --color-text-muted: #8b95a3;
+    --color-text-faint: #b0b8c4;
+
+    /* Three pastel accents matched to the three connect buttons */
+    --color-blue: #5b9eef;          /* USB — primary */
+    --color-blue-bg: #e8f1fc;
+    --color-blue-soft: rgba(91, 158, 239, 0.12);
+    --color-green: #4ec9a3;         /* BLE — success / connected */
+    --color-green-bg: #e7f7f1;
+    --color-purple: #a78bfa;        /* Demo — secondary accent */
+    --color-purple-bg: #f1ecfd;
+    --color-purple-soft: rgba(167, 139, 250, 0.12);
+
+    --color-danger: #e1545f;
+    --color-danger-bg: #fcebec;
+    --color-warning: #d99645;
+    --color-warning-bg: #fbf3e6;
+
+    font-family:
+        "Inter",
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        system-ui,
+        sans-serif;
+    color-scheme: light;
+    font-feature-settings: "ss01";
 }
 
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); }
-button { font-family: inherit; cursor: pointer; }
-input, select, textarea { font-family: inherit; }
+* {
+    box-sizing: border-box;
+}
+html, body {
+    margin: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+}
+body {
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+button {
+    font-family: inherit;
+    cursor: pointer;
+}
+input, select, textarea {
+    font-family: inherit;
+}
+
+a {
+    color: var(--color-purple);
+    text-decoration: none;
+}
+a:hover { text-decoration: underline; }
+
+code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85em;
+    color: var(--color-purple);
+    background: var(--color-purple-soft);
+    padding: 1px 6px;
+    border-radius: 4px;
+}
