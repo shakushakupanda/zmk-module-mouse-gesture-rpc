@@ -1,5 +1,5 @@
 /*
- * zmk-module-mouse-gesture-rpc -- Custom Studio RPC protocol
+ * zmk-module-mouse-gesture-rpc — Custom Studio RPC protocol
  *
  * Defines RPC messages that DYA Studio uses to manage mouse-gesture
  * patterns and runtime settings on the keyboard firmware.
@@ -37,6 +37,7 @@ message Gesture {
     GesturePattern pattern = 3;
     Binding binding = 4;
     bool enabled = 5;
+    uint32 set_id = 6;                // activation set (0..MG_NUM_SETS-1, default 0)
 }
 
 message Settings {

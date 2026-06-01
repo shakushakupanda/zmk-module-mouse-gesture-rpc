@@ -21,8 +21,15 @@
 #define MG_BEHAVIOR_MAX 16
 #define MG_PATTERN_MAX  8
 
-/* Maximum gestures the store can hold. Hard-bounded by the proto
- * ListGesturesResponse.gestures max_count (32). */
+/* Number of independent gesture sets, addressable by `&mg_set N`.
+ * Each set has its own list of gestures (typically one per direction). */
+#ifndef CONFIG_ZMK_MOUSE_GESTURE_RPC_NUM_SETS
+#define CONFIG_ZMK_MOUSE_GESTURE_RPC_NUM_SETS 5
+#endif
+#define MG_NUM_SETS CONFIG_ZMK_MOUSE_GESTURE_RPC_NUM_SETS
+
+/* Maximum gestures the store can hold across all sets. Hard-bounded by the
+ * proto ListGesturesResponse.gestures max_count (32). */
 #ifndef CONFIG_ZMK_MOUSE_GESTURE_RPC_MAX_GESTURES
 #define CONFIG_ZMK_MOUSE_GESTURE_RPC_MAX_GESTURES 32
 #endif
@@ -38,6 +45,7 @@ struct mg_gesture {
     uint8_t  pattern[MG_PATTERN_MAX];
     uint32_t binding_param1;
     uint32_t binding_param2;
+    uint32_t set_id;             /* which activation set this gesture belongs to (0..MG_NUM_SETS-1) */
     char     name[MG_NAME_MAX];
     char     binding_behavior[MG_BEHAVIOR_MAX];
 };
@@ -69,6 +77,16 @@ int mg_store_delete(uint32_t id);
 
 /* Wipe the store and re-seed from DTS defaults. */
 int mg_store_reset_to_defaults(void);
+
+/* === Multi-set (Approach D) =========================================== */
+
+/* Set the active set and push that set's gestures to kot149's trie.
+ * Called by the `&mg_set N` behavior on press. Returns 0 on success,
+ * -EINVAL if set_id is out of range. */
+int mg_store_activate_set(uint32_t set_id);
+
+/* Read the currently active set id. */
+uint32_t mg_store_active_set(void);
 
 /* === Settings (Phase 4) ============================================== */
 

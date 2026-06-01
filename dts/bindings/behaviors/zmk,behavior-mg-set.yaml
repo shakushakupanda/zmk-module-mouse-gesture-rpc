@@ -1,0 +1,14 @@
+# Copyright (c) 2026 shakushakupanda
+# SPDX-License-Identifier: MIT
+#
+# Mouse-gesture set activation behavior.
+#
+# Param 1 selects which gesture set (0..MG_NUM_SETS-1) becomes active
+# while the key is held. On press, the firmware syncs that set's
+# gestures to kot149's runtime trie and raises the mouse_gesture state
+# ON event. On release, the state OFF event fires (with refcount so
+# overlapping presses behave naturally).
+description: Mouse gesture set activation behavior
+compatible: "zmk,behavior-mg-set"
+
+include: one_param.yaml

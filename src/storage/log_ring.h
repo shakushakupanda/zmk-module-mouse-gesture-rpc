@@ -1,13 +1,10 @@
 /*
  * Lightweight RAM ring buffer for breadcrumb logging.
  *
- * Phase 5 freeze debugging: the firmware sometimes hangs after RPC
- * mutations because of races with kot149's input thread. We can't
- * easily attach a serial logger (USB CDC is already used by Studio),
- * so we keep a small ring of (timestamp, code, args) tuples in RAM.
- * After the freeze, if the RPC thread is still serviceable, the host
- * can read the ring via the GetLog RPC and inspect where the firmware
- * got stuck.
+ * Phase 5 freeze debugging aid: the firmware records short (timestamp,
+ * code, args) tuples at each checkpoint. After a freeze, if the RPC
+ * thread is still serviceable, the host can read the ring via the
+ * GetLog RPC and inspect where the firmware got stuck.
  */
 
 #ifndef MG_LOG_RING_H
@@ -69,6 +66,11 @@ enum mg_log_code {
     MG_LOG_RPC_DECODE_FAIL        = 0x0603,
     MG_LOG_RPC_DISPATCH           = 0x0604,
     MG_LOG_RPC_HANDLER_RETURN     = 0x0605,
+
+    /* &mg_set behavior (0x07) */
+    MG_LOG_MGSET_PRESSED          = 0x0701,
+    MG_LOG_MGSET_RELEASED         = 0x0702,
+    MG_LOG_MGSET_ACTIVATED        = 0x0703,
 };
 
 struct mg_log_entry {

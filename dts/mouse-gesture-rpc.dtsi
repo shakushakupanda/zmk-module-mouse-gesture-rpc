@@ -1,0 +1,13 @@
+/*
+ * Top-level include for zmk-module-mouse-gesture-rpc.
+ * Add to your keymap:
+ *
+ *   #include <mouse-gesture-rpc.dtsi>
+ *
+ * Provides the `&mg_set` behavior (multi-set Approach D):
+ *   &mg_set 0   // hold = activate gesture set 0
+ *   &mg_set 1
+ *   ...
+ */
+
+#include "behaviors/mg-set.dtsi"

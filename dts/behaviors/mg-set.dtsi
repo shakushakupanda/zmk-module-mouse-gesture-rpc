@@ -1,0 +1,18 @@
+/*
+ * Single instance of the `&mg_set` behavior.
+ * Usage in a keymap:
+ *
+ *   &mg_set 0   // activate set 0 while held
+ *   &mg_set 1   // activate set 1 while held
+ *   ...
+ */
+
+/ {
+    behaviors {
+        mg_set: behavior_mg_set {
+            compatible = "zmk,behavior-mg-set";
+            #binding-cells = <1>;
+            display-name = "Mouse Gesture Set";
+        };
+    };
+};

@@ -33,4 +33,15 @@ config ZMK_MOUSE_GESTURE_RPC_MAX_GESTURES
       Must not exceed the value declared for ListGesturesResponse.gestures
       in proto/zmk/mouse_gesture/custom.options.
 
+config ZMK_MOUSE_GESTURE_RPC_NUM_SETS
+    int "Number of gesture sets (multi-set Approach D)"
+    default 5
+    range 1 16
+    help
+      How many independent gesture sets the firmware exposes. Each set
+      is addressable by `&mg_set N` (N in 0..NUM_SETS-1). Sets share the
+      single mg input-processor instance: pressing `&mg_set N` switches
+      the active set and starts gesture matching with that set's
+      patterns. Suggested: 5 (= 5 activation keys × 4 directions).
+
 endif

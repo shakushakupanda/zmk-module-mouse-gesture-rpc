@@ -1,9 +1,10 @@
 /*
  * zmk-module-mouse-gesture-rpc -- Custom Studio RPC handler.
  *
- * All RPCs go through gesture_store.c (which persists to NVS and
- * syncs to kot149's runtime trie). New in this branch: GetLog which
- * returns recent breadcrumb entries written by mg_log_push.
+ * All RPCs go through gesture_store.c (which persists to NVS and syncs
+ * to kot149's runtime trie). Multi-set: each Gesture carries a set_id;
+ * sync_to_kot149() only sends the active set. The active set is
+ * switched by the `&mg_set N` behavior at runtime.
  */
 
 #include <pb_decode.h>
@@ -74,6 +75,7 @@ static void copy_to_proto(const struct mg_gesture *src,
     out->binding.param1 = src->binding_param1;
     out->binding.param2 = src->binding_param2;
     out->enabled = src->enabled;
+    out->set_id = src->set_id;
 }
 
 static void copy_from_proto(const zmk_mouse_gesture_Gesture *src,
@@ -81,6 +83,7 @@ static void copy_from_proto(const zmk_mouse_gesture_Gesture *src,
     memset(out, 0, sizeof(*out));
     out->id = src->id;
     out->enabled = src->enabled;
+    out->set_id  = src->set_id;
     strncpy(out->name, src->name, sizeof(out->name) - 1);
     strncpy(out->binding_behavior, src->binding.behavior,
             sizeof(out->binding_behavior) - 1);
@@ -145,18 +148,9 @@ static int handle_add_gesture(
 
     uint32_t new_id = 0;
     int rc = mg_store_add(&tmp, &new_id);
-    if (rc == -ENOSPC) {
-        set_error(resp, "store full");
-        return 0;
-    }
-    if (rc == -EINVAL) {
-        set_error(resp, "invalid pattern");
-        return 0;
-    }
-    if (rc) {
-        set_error(resp, "add failed");
-        return 0;
-    }
+    if (rc == -ENOSPC) { set_error(resp, "store full"); return 0; }
+    if (rc == -EINVAL) { set_error(resp, "invalid pattern or set_id"); return 0; }
+    if (rc)            { set_error(resp, "add failed"); return 0; }
 
     zmk_mouse_gesture_GestureResponse out =
         zmk_mouse_gesture_GestureResponse_init_zero;
@@ -178,14 +172,9 @@ static int handle_update_gesture(
     struct mg_gesture tmp;
     copy_from_proto(&req->gesture, &tmp);
     int rc = mg_store_update(&tmp);
-    if (rc == -ENOENT) {
-        set_error(resp, "gesture not found");
-        return 0;
-    }
-    if (rc) {
-        set_error(resp, "update failed");
-        return 0;
-    }
+    if (rc == -ENOENT) { set_error(resp, "gesture not found"); return 0; }
+    if (rc == -EINVAL) { set_error(resp, "invalid pattern or set_id"); return 0; }
+    if (rc)            { set_error(resp, "update failed"); return 0; }
 
     zmk_mouse_gesture_GestureResponse out =
         zmk_mouse_gesture_GestureResponse_init_zero;
@@ -201,14 +190,8 @@ static int handle_delete_gesture(
     const zmk_mouse_gesture_DeleteGestureRequest *req,
     zmk_mouse_gesture_Response *resp) {
     int rc = mg_store_delete(req->id);
-    if (rc == -ENOENT) {
-        set_error(resp, "gesture not found");
-        return 0;
-    }
-    if (rc) {
-        set_error(resp, "delete failed");
-        return 0;
-    }
+    if (rc == -ENOENT) { set_error(resp, "gesture not found"); return 0; }
+    if (rc)            { set_error(resp, "delete failed"); return 0; }
     zmk_mouse_gesture_Empty out = zmk_mouse_gesture_Empty_init_zero;
     resp->which_response_type = zmk_mouse_gesture_Response_empty_tag;
     resp->response_type.empty = out;
@@ -220,10 +203,7 @@ static int handle_reset_to_defaults(
     zmk_mouse_gesture_Response *resp) {
     (void)req;
     int rc = mg_store_reset_to_defaults();
-    if (rc) {
-        set_error(resp, "reset failed");
-        return 0;
-    }
+    if (rc) { set_error(resp, "reset failed"); return 0; }
     zmk_mouse_gesture_Empty out = zmk_mouse_gesture_Empty_init_zero;
     resp->which_response_type = zmk_mouse_gesture_Response_empty_tag;
     resp->response_type.empty = out;
@@ -267,14 +247,10 @@ static int handle_set_settings(
         .always_active       = req->settings.always_active,
     };
     int rc = mg_settings_set(&ns);
-    if (rc) {
-        set_error(resp, "set_settings failed");
-        return 0;
-    }
+    if (rc) { set_error(resp, "set_settings failed"); return 0; }
     return handle_get_settings(NULL, resp);
 }
 
-/* New: return the breadcrumb ring. */
 static int handle_get_log(
     const zmk_mouse_gesture_GetLogRequest *req,
     zmk_mouse_gesture_Response *resp) {
