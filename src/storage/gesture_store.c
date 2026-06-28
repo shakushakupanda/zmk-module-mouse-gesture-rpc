@@ -112,6 +112,26 @@ static int sync_to_kot149(void) {
     return rc;
 }
 
+/*
+ * Runtime trie rebuild can be surprisingly expensive and may contend with
+ * the input processor state while Studio RPC is waiting for a response.
+ * Keep RPC add/update/delete responsive: persist synchronously, then rebuild
+ * kot149's runtime trie from system work.  Activation via &mg_set still calls
+ * sync_to_kot149() directly because it must take effect before the next
+ * trackball movement.
+ */
+static void sync_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+    (void)sync_to_kot149();
+}
+
+static K_WORK_DELAYABLE_DEFINE(g_sync_work, sync_work_handler);
+
+static void schedule_runtime_sync(void) {
+    mg_log_push(MG_LOG_SYNC_RUNTIME_SET_PRE, g_active_set, 0);
+    (void)k_work_reschedule(&g_sync_work, K_NO_WAIT);
+}
+
 /* === DTS defaults extraction (mirrors handler.c phase-2 walk) ======= */
 
 #define MG_COMPAT zmk_input_processor_mouse_gesture
@@ -400,7 +420,7 @@ int mg_store_add(const struct mg_gesture *g, uint32_t *out_id) {
     mg_log_push(MG_LOG_ADD_SAVED, id, (uint32_t)rc);
     /* Re-sync only if this gesture belongs to the active set. */
     if (g_store[slot].set_id == g_active_set) {
-        sync_to_kot149();
+        schedule_runtime_sync();
     }
     mg_log_push(MG_LOG_ADD_SYNCED, id, 0);
     mg_log_push(MG_LOG_ADD_RETURN, id, (uint32_t)rc);
@@ -419,7 +439,7 @@ int mg_store_update(const struct mg_gesture *g) {
     mg_log_push(MG_LOG_UPDATE_SAVED, g->id, (uint32_t)rc);
     /* Re-sync if either the old or new set matched active. */
     if (old_set == g_active_set || slot->set_id == g_active_set) {
-        sync_to_kot149();
+        schedule_runtime_sync();
     }
     mg_log_push(MG_LOG_UPDATE_SYNCED, g->id, 0);
     mg_log_push(MG_LOG_UPDATE_RETURN, g->id, (uint32_t)rc);
@@ -437,7 +457,7 @@ int mg_store_delete(uint32_t id) {
     int rc = store_save();
     mg_log_push(MG_LOG_DELETE_SAVED, id, (uint32_t)rc);
     if (deleted_set == g_active_set) {
-        sync_to_kot149();
+        schedule_runtime_sync();
     }
     mg_log_push(MG_LOG_DELETE_RETURN, id, (uint32_t)rc);
     return rc;
@@ -450,7 +470,7 @@ int mg_store_reset_to_defaults(void) {
     int rc = store_save();
     mg_log_push(MG_LOG_RESET_SAVED, (uint32_t)g_count, (uint32_t)rc);
     g_active_set = 0;
-    sync_to_kot149();
+    schedule_runtime_sync();
     mg_log_push(MG_LOG_RESET_SYNCED, (uint32_t)g_count, 0);
     mg_log_push(MG_LOG_RESET_RETURN, (uint32_t)g_count, (uint32_t)rc);
     return rc;
