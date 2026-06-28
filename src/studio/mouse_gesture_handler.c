@@ -112,7 +112,7 @@ static int handle_list_gestures(
      */
     resp->which_response_type = zmk_mouse_gesture_Response_list_gestures_tag;
     zmk_mouse_gesture_ListGesturesResponse *out = &resp->response_type.list_gestures;
-    *out = zmk_mouse_gesture_ListGesturesResponse_init_zero;
+    *out = (zmk_mouse_gesture_ListGesturesResponse)zmk_mouse_gesture_ListGesturesResponse_init_zero;
 
     size_t count = mg_store_count();
     if (count > ARRAY_SIZE(out->gestures)) count = ARRAY_SIZE(out->gestures);
