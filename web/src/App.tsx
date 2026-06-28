@@ -567,7 +567,7 @@ function GestureEditorModal({
         const g: Gesture = {
             id: initial.id,
             name,
-            pattern: { directions },
+            pattern: { directions: directions.slice(0, 1) },
             binding: {
                 behavior: behavior.trim() === "kp" ? "key_press" : behavior.trim(),
                 param1,
@@ -603,7 +603,7 @@ function GestureEditorModal({
                 </div>
 
                 <div className="field">
-                    <label>Pattern (sequence of directions)</label>
+                    <label>Pattern (single direction)</label>
                     <div className="direction-picker">
                         {directions.map((d, i) => (
                             <select
@@ -620,25 +620,12 @@ function GestureEditorModal({
                                 <option value={Direction.LEFT}>← LEFT</option>
                             </select>
                         ))}
-                        <button
-                            type="button"
-                            className="btn"
-                            onClick={() => setDirections([...directions, Direction.UP])}
-                            disabled={directions.length >= 8}
-                        >
-                            + step
-                        </button>
-                        <button
-                            type="button"
-                            className="btn"
-                            onClick={() => setDirections(directions.slice(0, -1))}
-                            disabled={directions.length <= 1}
-                        >
-                            − step
-                        </button>
+                        {/* Grid mode is intentionally one-direction-per-cell.
+                            Multi-step gestures were the original engine shape, but
+                            the DYA action assignment UI maps 5 sets x 4 directions. */}
                     </div>
                     <div className="muted" style={{ marginTop: 4 }}>
-                        Preview: <span style={{ fontSize: "1.2rem", letterSpacing: 4, color: "var(--color-blue)" }}>{patternToArrows(directions)}</span>
+                        Preview: <span style={{ fontSize: "1.2rem", letterSpacing: 4, color: "var(--color-blue)" }}>{patternToArrows(directions.slice(0, 1))}</span>
                     </div>
                 </div>
 

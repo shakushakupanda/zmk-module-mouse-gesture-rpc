@@ -290,7 +290,8 @@ SETTINGS_STATIC_HANDLER_DEFINE(mg_store, "cmg", NULL, store_set_cb, NULL, NULL);
 static int copy_into_slot(struct mg_gesture *slot,
                           const struct mg_gesture *src,
                           uint32_t id) {
-    if (src->pattern_len == 0 || src->pattern_len > MG_PATTERN_MAX) {
+    /* The Studio grid is one-direction-per-cell (set x ↑/→/↓/←). */
+    if (src->pattern_len != 1) {
         return -EINVAL;
     }
     if (src->set_id >= MG_NUM_SETS) {
@@ -349,6 +350,25 @@ static void compact(void) {
     g_count = dst;
 }
 
+static bool gesture_slot_valid(const struct mg_gesture *g) {
+    if (!g->in_use) return true;
+    if (g->set_id >= MG_NUM_SETS) return false;
+    if (g->pattern_len != 1) return false;
+    if (g->pattern[0] > 3) return false;
+    if (g->binding_behavior[0] == '\0') return false;
+    return true;
+}
+
+static void sanitize_loaded_store(void) {
+    for (size_t i = 0; i < MG_MAX_GESTURES; i++) {
+        if (!gesture_slot_valid(&g_store[i])) {
+            LOG_WRN("mg_store: dropping invalid saved gesture slot %u", (unsigned)i);
+            memset(&g_store[i], 0, sizeof(g_store[i]));
+        }
+    }
+    compact();
+}
+
 /* === Public API ====================================================== */
 
 int mg_store_init(void) {
@@ -367,16 +387,20 @@ int mg_store_init(void) {
 
     (void)settings_load_subtree("cmg");
 
+    if (g_loaded) {
+        sanitize_loaded_store();
+    }
+
     if (!g_loaded || g_count == 0) {
-        LOG_INF("mg_store: no saved data, seeding from DTS defaults (n=%u)",
+        LOG_INF("mg_store: no valid saved data, seeding from DTS defaults (n=%u)",
                 (unsigned)NUM_DTS_DEFAULTS);
         seed_from_dts();
+        sanitize_loaded_store();
         mg_log_push(MG_LOG_BOOT_SEEDED, (uint32_t)NUM_DTS_DEFAULTS, 0);
         store_save();
     } else {
-        recount();
         mg_log_push(MG_LOG_BOOT_LOADED, (uint32_t)g_count, 0);
-        LOG_INF("mg_store: loaded %u gestures from NVS", (unsigned)g_count);
+        LOG_INF("mg_store: loaded %u valid gestures from NVS", (unsigned)g_count);
     }
 
     mg_log_push(MG_LOG_BOOT_SYNC_PRE, (uint32_t)g_count, 0);

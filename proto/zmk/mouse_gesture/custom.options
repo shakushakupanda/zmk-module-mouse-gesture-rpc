@@ -11,4 +11,4 @@ zmk.mouse_gesture.ErrorResponse.message  max_size:64
 
 # Repeated-field maximums
 zmk.mouse_gesture.GesturePattern.directions      max_count:8
-zmk.mouse_gesture.ListGesturesResponse.gestures  max_count:32
+zmk.mouse_gesture.ListGesturesResponse.gestures  max_count:20

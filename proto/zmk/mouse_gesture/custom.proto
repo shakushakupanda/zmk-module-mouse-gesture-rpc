@@ -74,7 +74,7 @@ message GetLogRequest {}
 // === Responses ===
 
 message ListGesturesResponse {
-    repeated Gesture gestures = 1;  // max_count: 32 (see custom.options)
+    repeated Gesture gestures = 1;  // max_count: 20 (see custom.options)
 }
 
 message GestureResponse { Gesture gesture = 1; }

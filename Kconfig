@@ -26,10 +26,11 @@ config ZMK_MOUSE_GESTURE_RPC_LOG_LEVEL
 
 config ZMK_MOUSE_GESTURE_RPC_MAX_GESTURES
     int "Maximum number of stored gestures"
-    default 32
-    range 1 32
+    default 20
+    range 1 20
     help
       Hard upper bound on how many gestures the runtime store can hold.
+      Default is 20 = 5 sets x 4 one-direction gesture cells.
       Must not exceed the value declared for ListGesturesResponse.gestures
       in proto/zmk/mouse_gesture/custom.options.
 
