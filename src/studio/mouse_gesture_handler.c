@@ -103,19 +103,27 @@ static int handle_list_gestures(
     const zmk_mouse_gesture_ListGesturesRequest *req,
     zmk_mouse_gesture_Response *resp) {
     (void)req;
-    zmk_mouse_gesture_ListGesturesResponse out =
-        zmk_mouse_gesture_ListGesturesResponse_init_zero;
+
+    /*
+     * Do not allocate zmk_mouse_gesture_ListGesturesResponse as a local
+     * variable here.  With max_count:32 it is large enough to overflow the
+     * Studio RPC thread stack on small MCUs when the gesture page opens.
+     * Fill the custom subsystem response buffer in-place instead.
+     */
+    resp->which_response_type = zmk_mouse_gesture_Response_list_gestures_tag;
+    zmk_mouse_gesture_ListGesturesResponse *out = &resp->response_type.list_gestures;
+    *out = zmk_mouse_gesture_ListGesturesResponse_init_zero;
 
     size_t count = mg_store_count();
-    if (count > ARRAY_SIZE(out.gestures)) count = ARRAY_SIZE(out.gestures);
-    out.gestures_count = count;
+    if (count > ARRAY_SIZE(out->gestures)) count = ARRAY_SIZE(out->gestures);
+
+    size_t written = 0;
     for (size_t i = 0; i < count; i++) {
         const struct mg_gesture *src = mg_store_at(i);
         if (!src) break;
-        copy_to_proto(src, &out.gestures[i]);
+        copy_to_proto(src, &out->gestures[written++]);
     }
-    resp->which_response_type = zmk_mouse_gesture_Response_list_gestures_tag;
-    resp->response_type.list_gestures = out;
+    out->gestures_count = written;
     return 0;
 }
 
