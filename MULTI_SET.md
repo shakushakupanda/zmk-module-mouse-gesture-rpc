@@ -1,10 +1,10 @@
 # Multi-Set Gestures (Approach D)
 
-Three independent gesture sets, each addressable by `&mg_set N` (0..2).
+Five independent gesture sets, each addressable by `&mg_set N` (0..4).
 Hold the activation key, stroke a single direction (↑/→/↓/←), release —
 the binding configured for that (set, direction) cell fires.
 
-All 3×4=12 binding cells are dynamically editable via the Web UI; no
+All 5×4=20 binding cells are dynamically editable via the Web UI; no
 firmware rebuild required to change them.
 
 ## Concepts
@@ -64,7 +64,7 @@ mg: mouse_gesture {
 
 Without `always-active`, the matcher only fires while `&mg_set N` is held.
 
-### 3. Bind `&mg_set N` to 3 keys of your choice
+### 3. Bind `&mg_set N` to 5 keys of your choice
 
 Example: replace 5 thumb keys on the mac_layer. Any keys you like — they
 just need to be reachable with the left hand while the right hand drives
@@ -118,7 +118,7 @@ remains on (refcount stays positive).
 
 ## Tuning NUM_SETS
 
-`CONFIG_ZMK_MOUSE_GESTURE_RPC_NUM_SETS` (default 3, range 1..3). To use
+`CONFIG_ZMK_MOUSE_GESTURE_RPC_NUM_SETS` (default 5, range 1..16). To use
 more or fewer sets, adjust in your conf and recompile. The Web UI grid
 always shows the first NUM_SETS rows.
 
