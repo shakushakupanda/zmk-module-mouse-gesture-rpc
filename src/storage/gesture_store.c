@@ -162,7 +162,7 @@ struct mg_dts_default {
     uint32_t       binding_param2;
 };
 
-#if DT_NODE_EXISTS(MG_NODE)
+#if DT_NODE_EXISTS(MG_NODE) && (DT_NUM_CHILDREN(MG_NODE) > 0)
 
 #define APPEND_PATTERN_BYTE(node_id, prop, idx) DT_PROP_BY_IDX(node_id, prop, idx),
 
