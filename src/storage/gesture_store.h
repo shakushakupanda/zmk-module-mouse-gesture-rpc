@@ -24,14 +24,14 @@
 /* Number of independent gesture sets, addressable by `&mg_set N`.
  * Each set has its own list of gestures (typically one per direction). */
 #ifndef CONFIG_ZMK_MOUSE_GESTURE_RPC_NUM_SETS
-#define CONFIG_ZMK_MOUSE_GESTURE_RPC_NUM_SETS 5
+#define CONFIG_ZMK_MOUSE_GESTURE_RPC_NUM_SETS 3
 #endif
 #define MG_NUM_SETS CONFIG_ZMK_MOUSE_GESTURE_RPC_NUM_SETS
 
 /* Maximum gestures the store can hold across all sets. Hard-bounded by the
- * proto ListGesturesResponse.gestures max_count (20). */
+ * proto ListGesturesResponse.gestures max_count (12). */
 #ifndef CONFIG_ZMK_MOUSE_GESTURE_RPC_MAX_GESTURES
-#define CONFIG_ZMK_MOUSE_GESTURE_RPC_MAX_GESTURES 20
+#define CONFIG_ZMK_MOUSE_GESTURE_RPC_MAX_GESTURES 12
 #endif
 #define MG_MAX_GESTURES CONFIG_ZMK_MOUSE_GESTURE_RPC_MAX_GESTURES
 

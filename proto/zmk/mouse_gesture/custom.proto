@@ -37,7 +37,7 @@ message Gesture {
     GesturePattern pattern = 3;
     Binding binding = 4;
     bool enabled = 5;
-    uint32 set_id = 6;                // activation set (0..MG_NUM_SETS-1, default 0)
+    uint32 set_id = 6;                // activation set (0..MG_NUM_SETS-1, default 0; default NUM_SETS=3)
 }
 
 message Settings {
@@ -74,7 +74,7 @@ message GetLogRequest {}
 // === Responses ===
 
 message ListGesturesResponse {
-    repeated Gesture gestures = 1;  // max_count: 20 (see custom.options)
+    repeated Gesture gestures = 1;  // max_count: 12 (see custom.options)
 }
 
 message GestureResponse { Gesture gesture = 1; }

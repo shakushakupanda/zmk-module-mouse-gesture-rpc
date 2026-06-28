@@ -291,7 +291,7 @@ function App() {
 
 /** Number of gesture sets exposed by the firmware. Must match
  * CONFIG_ZMK_MOUSE_GESTURE_RPC_NUM_SETS. */
-const NUM_SETS = 5;
+const NUM_SETS = 3;
 
 /** Single-stroke directions, in the order shown in the grid. */
 const GRID_DIRECTIONS: Direction[] = [
@@ -622,7 +622,7 @@ function GestureEditorModal({
                         ))}
                         {/* Grid mode is intentionally one-direction-per-cell.
                             Multi-step gestures were the original engine shape, but
-                            the DYA action assignment UI maps 5 sets x 4 directions. */}
+                            the DYA action assignment UI maps 3 sets x 4 directions. */}
                     </div>
                     <div className="muted" style={{ marginTop: 4 }}>
                         Preview: <span style={{ fontSize: "1.2rem", letterSpacing: 4, color: "var(--color-blue)" }}>{patternToArrows(directions.slice(0, 1))}</span>
