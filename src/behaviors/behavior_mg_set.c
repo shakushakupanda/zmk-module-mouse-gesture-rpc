@@ -69,34 +69,6 @@ static const struct behavior_parameter_metadata mg_set_metadata = {
 
 #endif /* IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA) */
 
-#if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
-
-static bool is_fixed_set_alias_dev(const struct device *dev) {
-    if (!dev || !dev->name) {
-        return false;
-    }
-
-    size_t len = strlen(dev->name);
-    if (len < 2 || dev->name[len - 2] != '_') {
-        return false;
-    }
-
-    char c = dev->name[len - 1];
-    return c >= '0' && c <= '2';
-}
-
-static int mg_set_get_parameter_metadata(const struct device *dev,
-                                         struct behavior_parameter_metadata *param_metadata) {
-    if (is_fixed_set_alias_dev(dev)) {
-        return zmk_behavior_get_empty_param_metadata(dev, param_metadata);
-    }
-
-    *param_metadata = mg_set_metadata;
-    return 0;
-}
-
-#endif /* IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA) */
-
 static void raise_state(bool is_active) {
     raise_zmk_mouse_gesture_state_changed((struct zmk_mouse_gesture_state_changed){
         .is_active = is_active
@@ -181,7 +153,7 @@ static const struct behavior_driver_api behavior_mg_set_driver_api = {
     .binding_pressed = on_pressed,
     .binding_released = on_released,
 #if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
-    .get_parameter_metadata = mg_set_get_parameter_metadata,
+    .parameter_metadata = &mg_set_metadata,
 #endif /* IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA) */
 };
 
@@ -193,3 +165,31 @@ static const struct behavior_driver_api behavior_mg_set_driver_api = {
 DT_INST_FOREACH_STATUS_OKAY(MG_SET_INST)
 
 #endif /* DT_HAS_COMPAT_STATUS_OKAY(DT_DRV_COMPAT) */
+
+/* DYA/ZMK Studio friendly fixed aliases: &mg_set_0 / &mg_set_1 / &mg_set_2.
+ * These use a separate zero-param compatible so Studio does not ask for an
+ * extra set ID after the user has already chosen Key 0/1/2.
+ */
+#undef DT_DRV_COMPAT
+#define DT_DRV_COMPAT zmk_behavior_mg_set_fixed
+
+#if DT_HAS_COMPAT_STATUS_OKAY(DT_DRV_COMPAT)
+
+static const struct behavior_driver_api behavior_mg_set_fixed_driver_api = {
+    .locality = BEHAVIOR_LOCALITY_CENTRAL,
+    .binding_pressed = on_pressed,
+    .binding_released = on_released,
+#if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
+    .get_parameter_metadata = zmk_behavior_get_empty_param_metadata,
+#endif /* IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA) */
+};
+
+#define MG_SET_FIXED_INST(n)                                                       \
+    BEHAVIOR_DT_INST_DEFINE(n, behavior_mg_set_init, NULL, NULL, NULL,             \
+                            POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT,      \
+                            &behavior_mg_set_fixed_driver_api);
+
+DT_INST_FOREACH_STATUS_OKAY(MG_SET_FIXED_INST)
+
+#endif /* DT_HAS_COMPAT_STATUS_OKAY(zmk_behavior_mg_set_fixed) */
+

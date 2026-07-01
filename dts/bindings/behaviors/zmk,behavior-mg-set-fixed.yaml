@@ -1,0 +1,7 @@
+# Copyright (c) 2026 shakushakupanda
+# SPDX-License-Identifier: MIT
+
+description: Fixed mouse gesture key behavior for DYA/ZMK Studio
+compatible: "zmk,behavior-mg-set-fixed"
+
+include: zero_param.yaml

@@ -1,28 +1,10 @@
 # Copyright (c) 2026 shakushakupanda
 # SPDX-License-Identifier: MIT
 #
-# Mouse-gesture set activation behavior.
-#
-# Supports both forms:
-#   &mg_set 1    // one-param generic behavior
-#   &mg_set_1    // zero-param DYA Studio friendly alias
+# Generic one-param mouse-gesture set activation behavior.
+# Use &mg_set N in hand-written keymaps.
 
 description: Mouse gesture set activation behavior
 compatible: "zmk,behavior-mg-set"
 
-include: behavior-metadata.yaml
-
-properties:
-  label:
-    type: string
-    required: false
-    deprecated: true
-  "#binding-cells":
-    type: int
-    required: true
-    enum:
-      - 0
-      - 1
-
-binding-cells:
-  - param1
+include: one_param.yaml
