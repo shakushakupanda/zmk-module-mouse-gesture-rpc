@@ -773,7 +773,6 @@ function GestureEditorModal({
     const [directions, setDirections] = useState<Direction[]>(
         initial.pattern.directions.length ? initial.pattern.directions : [Direction.UP],
     );
-    const [setId, setSetId] = useState(initial.setId);
     const [behavior, setBehavior] = useState(initial.binding.behavior || "key_press");
     const [param1, setParam1] = useState<number>(initial.binding.param1);
     const [param2Str, setParam2Str] = useState(
@@ -800,7 +799,7 @@ function GestureEditorModal({
                 param2: parseIntLoose(param2Str),
             },
             enabled,
-            setId,
+            setId: initial.setId,
         };
         onSave(g);
     };
@@ -809,16 +808,6 @@ function GestureEditorModal({
         <div className="modal-backdrop">
             <div className="modal card">
                 <h2>{title}</h2>
-
-                <div className="field">
-                    <label>Gesture key ID</label>
-                    <select value={setId} onChange={(e) => setSetId(parseInt(e.target.value, 10))}>
-                        {Array.from({ length: NUM_GESTURE_KEYS }, (_, id) => (
-                            <option key={id} value={id}>Gesture key {id} / &mg_set {id}</option>
-                        ))}
-                    </select>
-                </div>
-
                 <div className="field">
                     <label>Name</label>
                     <input
