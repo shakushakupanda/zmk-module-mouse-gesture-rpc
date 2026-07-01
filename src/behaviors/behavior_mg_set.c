@@ -144,6 +144,12 @@ static int behavior_mg_set_init(const struct device *dev) {
 }
 
 static const struct behavior_driver_api behavior_mg_set_driver_api = {
+    /* The trackball and mouse-gesture input processor live on the central side.
+     * In split builds, run &mg_set on central even when the key is pressed on
+     * the peripheral half; otherwise only the peripheral store switches set and
+     * all gestures appear to use the same central set.
+     */
+    .locality = BEHAVIOR_LOCALITY_CENTRAL,
     .binding_pressed = on_pressed,
     .binding_released = on_released,
 #if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
