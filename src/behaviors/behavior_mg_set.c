@@ -69,6 +69,34 @@ static const struct behavior_parameter_metadata mg_set_metadata = {
 
 #endif /* IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA) */
 
+#if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
+
+static bool is_fixed_set_alias_dev(const struct device *dev) {
+    if (!dev || !dev->name) {
+        return false;
+    }
+
+    size_t len = strlen(dev->name);
+    if (len < 2 || dev->name[len - 2] != '_') {
+        return false;
+    }
+
+    char c = dev->name[len - 1];
+    return c >= '0' && c <= '2';
+}
+
+static int mg_set_get_parameter_metadata(const struct device *dev,
+                                         struct behavior_parameter_metadata *param_metadata) {
+    if (is_fixed_set_alias_dev(dev)) {
+        return zmk_behavior_get_empty_param_metadata(dev, param_metadata);
+    }
+
+    *param_metadata = mg_set_metadata;
+    return 0;
+}
+
+#endif /* IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA) */
+
 static void raise_state(bool is_active) {
     raise_zmk_mouse_gesture_state_changed((struct zmk_mouse_gesture_state_changed){
         .is_active = is_active
@@ -153,7 +181,7 @@ static const struct behavior_driver_api behavior_mg_set_driver_api = {
     .binding_pressed = on_pressed,
     .binding_released = on_released,
 #if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
-    .parameter_metadata = &mg_set_metadata,
+    .get_parameter_metadata = mg_set_get_parameter_metadata,
 #endif /* IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA) */
 };
 
