@@ -27,15 +27,8 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 /* === Subsystem registration ============================================= */
 
 static struct zmk_rpc_custom_subsystem_meta mouse_gesture_meta = {
-    /*
-     * Keep metadata intentionally minimal.  DYA Studio asks for the custom
-     * subsystem list immediately after connecting; returning UI URLs here adds
-     * another nanopb callback/string encode path on the hot connection path.
-     * The standalone Mouse Gesture Studio can still connect directly by using
-     * the subsystem identifier below.
-     */
-    .ui_urls = NULL,
-    .ui_urls_count = 0,
+    ZMK_RPC_CUSTOM_SUBSYSTEM_UI_URLS(
+        "https://shakushakupanda.github.io/zmk-module-mouse-gesture-rpc/"),
     .security = ZMK_STUDIO_RPC_HANDLER_UNSECURED,
 };
 
