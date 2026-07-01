@@ -454,3 +454,92 @@
     border-radius: 50%;
     background: currentColor;
 }
+
+/* Gesture key × direction grid */
+.gesture-grid-wrap {
+    overflow-x: auto;
+    margin: 14px 0 18px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+}
+.gesture-grid-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 680px;
+}
+.gesture-grid-table th,
+.gesture-grid-table td {
+    border-bottom: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    padding: 8px;
+    vertical-align: stretch;
+}
+.gesture-grid-table th:last-child,
+.gesture-grid-table td:last-child { border-right: 0; }
+.gesture-grid-table tr:last-child th,
+.gesture-grid-table tr:last-child td { border-bottom: 0; }
+.gesture-grid-table thead th {
+    background: var(--color-bg-soft);
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-align: center;
+}
+.gesture-grid-table tbody th {
+    width: 128px;
+    background: var(--color-bg-soft);
+    text-align: left;
+}
+.set-label {
+    color: var(--color-text);
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+.gesture-cell {
+    width: 100%;
+    min-height: 78px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 4px;
+    border-radius: 10px;
+    border: 1px dashed var(--color-border-strong);
+    background: var(--color-bg-elev);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    text-align: left;
+    padding: 10px;
+    transition: all 0.12s ease;
+}
+.gesture-cell:hover:not(:disabled) {
+    border-color: var(--color-blue);
+    background: var(--color-blue-bg);
+    color: var(--color-blue);
+}
+.gesture-cell.configured {
+    border-style: solid;
+    border-color: rgba(91, 158, 239, 0.35);
+    background: var(--color-blue-bg);
+    color: var(--color-text);
+}
+.cell-name {
+    font-weight: 600;
+    color: var(--color-text);
+}
+.cell-binding {
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+    word-break: break-word;
+}
+.cell-empty {
+    font-size: 0.82rem;
+    font-weight: 500;
+}
+.cell-disabled {
+    font-size: 0.72rem;
+    color: var(--color-danger);
+}
+.gesture-list {
+    margin-top: 14px;
+}

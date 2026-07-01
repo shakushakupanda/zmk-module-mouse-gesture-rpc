@@ -45,6 +45,8 @@ export interface Gesture {
     pattern: GesturePattern;
     binding: Binding;
     enabled: boolean;
+    /** Gesture key / activation set ID selected by &mg_set N. */
+    setId: number;
 }
 
 export interface Settings {
@@ -130,6 +132,7 @@ function encodeGesture(g: Gesture): Uint8Array {
     parts.push(encodeMessageField(3, encodeGesturePattern(g.pattern)));
     parts.push(encodeMessageField(4, encodeBinding(g.binding)));
     if (g.enabled) parts.push(encodeBoolField(5, g.enabled));
+    if (g.setId !== 0) parts.push(encodeVarintField(6, g.setId));
     return concat(...parts);
 }
 
@@ -140,6 +143,7 @@ function decodeGesture(buf: Uint8Array): Gesture {
         pattern: { directions: [] },
         binding: { behavior: "", param1: 0, param2: 0 },
         enabled: false,
+        setId: 0,
     };
     for (const f of walkFields(buf)) {
         if (f.field === 1 && f.value !== undefined) out.id = f.value;
@@ -147,6 +151,7 @@ function decodeGesture(buf: Uint8Array): Gesture {
         else if (f.field === 3) out.pattern = decodeGesturePattern(f.raw);
         else if (f.field === 4) out.binding = decodeBinding(f.raw);
         else if (f.field === 5 && f.value !== undefined) out.enabled = f.value !== 0;
+        else if (f.field === 6 && f.value !== undefined) out.setId = f.value;
     }
     return out;
 }
@@ -293,6 +298,7 @@ export function parseResponse(buf: Uint8Array): Response {
                 pattern: { directions: [] },
                 binding: { behavior: "", param1: 0, param2: 0 },
                 enabled: false,
+                setId: 0,
             };
             for (const f2 of walkFields(f.raw)) {
                 if (f2.field === 1) g = decodeGesture(f2.raw);

@@ -47,7 +47,7 @@ function App() {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [editing, setEditing] = useState<Gesture | null>(null);
-    const [adding, setAdding] = useState(false);
+    const [adding, setAdding] = useState<Gesture | null>(null);
     const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
     const [logVisible, setLogVisible] = useState(false);
 
@@ -100,7 +100,7 @@ function App() {
             setError(null);
             try {
                 await conn.client.addGesture(g);
-                setAdding(false);
+                setAdding(null);
                 await reload();
             } catch (e) {
                 setError(e instanceof Error ? e.message : String(e));
@@ -225,21 +225,34 @@ function App() {
                                 <button className="btn btn-danger" onClick={() => void onReset()} disabled={busy}>
                                     Reset
                                 </button>
-                                <button className="btn btn-primary" onClick={() => setAdding(true)} disabled={busy}>
+                                <button className="btn btn-primary" onClick={() => setAdding(blankGesture())} disabled={busy}>
                                     + Add
                                 </button>
                             </div>
                         </div>
+                        <p className="muted" style={{ marginTop: 0 }}>
+                            Each row is a gesture key ID (<code>&amp;mg_set N</code>). Each column is the direction stroked while holding that gesture key.
+                        </p>
+                        <GestureGrid
+                            gestures={data.gestures}
+                            busy={busy}
+                            onCellClick={(setId, dir) => {
+                                const existing = findGestureInCell(data.gestures, setId, dir);
+                                if (existing) setEditing(existing);
+                                else setAdding(blankGesture(setId, dir));
+                            }}
+                        />
+
                         {data.gestures.length === 0 ? (
                             <div className="empty-state">{busy ? "Loading…" : "No gestures configured."}</div>
                         ) : (
-                            <div>
+                            <div className="gesture-list">
                                 {data.gestures.map((g) => (
                                     <div className="gesture-row" key={g.id}>
                                         <div>
                                             <div className="gesture-name">{g.name || `#${g.id}`}</div>
                                             <div className="gesture-id">
-                                                id {g.id}
+                                                id {g.id} · gesture key {g.setId}
                                                 {!g.enabled ? " · disabled" : ""}
                                             </div>
                                         </div>
@@ -296,9 +309,9 @@ function App() {
 
             {adding && (
                 <GestureEditorModal
-                    initial={blankGesture()}
-                    title="Add gesture"
-                    onCancel={() => setAdding(false)}
+                    initial={adding}
+                    title={`Add gesture (Key ${adding.setId} · ${patternToArrows(adding.pattern.directions)})`}
+                    onCancel={() => setAdding(null)}
                     onSave={onAdd}
                     disabled={busy}
                 />
@@ -317,17 +330,93 @@ function App() {
     );
 }
 
-function blankGesture(): Gesture {
+const NUM_GESTURE_KEYS = 3;
+const GRID_DIRECTIONS = [Direction.UP, Direction.RIGHT, Direction.DOWN, Direction.LEFT] as const;
+
+function blankGesture(setId = 0, dir: Direction = Direction.UP): Gesture {
     return {
         id: 0,
         name: "",
-        pattern: { directions: [Direction.UP, Direction.RIGHT] },
+        pattern: { directions: [dir] },
         binding: { behavior: "key_press", param1: 0, param2: 0 },
         enabled: true,
+        setId,
     };
 }
 
+function findGestureInCell(gestures: Gesture[], setId: number, dir: Direction): Gesture | null {
+    return gestures.find((g) =>
+        g.setId === setId &&
+        g.pattern.directions.length === 1 &&
+        g.pattern.directions[0] === dir,
+    ) ?? null;
+}
+
 // === Subcomponents =====================================================
+
+function GestureGrid({
+    gestures,
+    busy,
+    onCellClick,
+}: {
+    gestures: Gesture[];
+    busy: boolean;
+    onCellClick: (setId: number, dir: Direction) => void;
+}) {
+    return (
+        <div className="gesture-grid-wrap">
+            <table className="gesture-grid-table">
+                <thead>
+                    <tr>
+                        <th>Gesture key</th>
+                        {GRID_DIRECTIONS.map((d) => (
+                            <th key={d}>{patternToArrows([d])}</th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {Array.from({ length: NUM_GESTURE_KEYS }, (_, setId) => (
+                        <tr key={setId}>
+                            <th>
+                                <div className="set-label">Key {setId}</div>
+                                <code>&amp;mg_set {setId}</code>
+                            </th>
+                            {GRID_DIRECTIONS.map((dir) => {
+                                const g = findGestureInCell(gestures, setId, dir);
+                                return (
+                                    <td key={dir}>
+                                        <button
+                                            type="button"
+                                            className={`gesture-cell ${g ? "configured" : "empty"}`}
+                                            onClick={() => onCellClick(setId, dir)}
+                                            disabled={busy}
+                                        >
+                                            {g ? (
+                                                <>
+                                                    <span className="cell-name">{g.name || `#${g.id}`}</span>
+                                                    <span className="cell-binding">
+                                                        <BindingLabel
+                                                            behavior={g.binding.behavior}
+                                                            param1={g.binding.param1}
+                                                            param2={g.binding.param2}
+                                                        />
+                                                    </span>
+                                                    {!g.enabled && <span className="cell-disabled">disabled</span>}
+                                                </>
+                                            ) : (
+                                                <span className="cell-empty">+ assign</span>
+                                            )}
+                                        </button>
+                                    </td>
+                                );
+                            })}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
 
 function ConnectionPill({
     conn,
@@ -547,6 +636,7 @@ function GestureEditorModal({
     const [directions, setDirections] = useState<Direction[]>(
         initial.pattern.directions.length ? initial.pattern.directions : [Direction.UP],
     );
+    const [setId, setSetId] = useState(initial.setId);
     const [behavior, setBehavior] = useState(initial.binding.behavior || "key_press");
     const [param1, setParam1] = useState<number>(initial.binding.param1);
     const [param2Str, setParam2Str] = useState(
@@ -573,6 +663,7 @@ function GestureEditorModal({
                 param2: parseIntLoose(param2Str),
             },
             enabled,
+            setId,
         };
         onSave(g);
     };
@@ -581,6 +672,15 @@ function GestureEditorModal({
         <div className="modal-backdrop">
             <div className="modal card">
                 <h2>{title}</h2>
+
+                <div className="field">
+                    <label>Gesture key ID</label>
+                    <select value={setId} onChange={(e) => setSetId(parseInt(e.target.value, 10))}>
+                        {Array.from({ length: NUM_GESTURE_KEYS }, (_, id) => (
+                            <option key={id} value={id}>Gesture key {id} / &mg_set {id}</option>
+                        ))}
+                    </select>
+                </div>
 
                 <div className="field">
                     <label>Name</label>
