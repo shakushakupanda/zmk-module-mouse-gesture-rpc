@@ -35,6 +35,39 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 /* Global refcount of currently-held mg_set keys. Atomic for thread safety. */
 static atomic_t g_held_count;
 
+
+#if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
+
+static const struct behavior_parameter_value_metadata mg_set_param_values[] = {
+    {
+        .display_name = "Set 0",
+        .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE,
+        .value = 0,
+    },
+    {
+        .display_name = "Set 1",
+        .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE,
+        .value = 1,
+    },
+    {
+        .display_name = "Set 2",
+        .type = BEHAVIOR_PARAMETER_VALUE_TYPE_VALUE,
+        .value = 2,
+    },
+};
+
+static const struct behavior_parameter_metadata_set mg_set_param_metadata_set[] = {{
+    .param1_values = mg_set_param_values,
+    .param1_values_len = ARRAY_SIZE(mg_set_param_values),
+}};
+
+static const struct behavior_parameter_metadata mg_set_metadata = {
+    .sets_len = ARRAY_SIZE(mg_set_param_metadata_set),
+    .sets = mg_set_param_metadata_set,
+};
+
+#endif /* IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA) */
+
 static void raise_state(bool is_active) {
     raise_zmk_mouse_gesture_state_changed((struct zmk_mouse_gesture_state_changed){
         .is_active = is_active
@@ -91,6 +124,9 @@ static int behavior_mg_set_init(const struct device *dev) {
 static const struct behavior_driver_api behavior_mg_set_driver_api = {
     .binding_pressed = on_pressed,
     .binding_released = on_released,
+#if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
+    .parameter_metadata = &mg_set_metadata,
+#endif /* IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA) */
 };
 
 #define MG_SET_INST(n)                                                             \
