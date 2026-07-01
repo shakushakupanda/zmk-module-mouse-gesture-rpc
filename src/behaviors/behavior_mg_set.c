@@ -25,6 +25,7 @@
 
 #include <zmk/behavior.h>
 #include <zmk/events/mouse_gesture_state_changed.h>
+#include <zmk/mouse_gesture/runtime.h>
 
 #include "../storage/gesture_store.h"
 #include "../storage/log_ring.h"
@@ -112,6 +113,7 @@ static int on_pressed(struct zmk_behavior_binding *binding,
     /* If this is the first key held, turn matcher ON. */
     atomic_val_t prev = atomic_inc(&g_held_count);
     if (prev == 0) {
+        zmk_mouse_gesture_runtime_set_suppress_cursor(true);
         raise_state(true);
     }
 
@@ -130,9 +132,11 @@ static int on_released(struct zmk_behavior_binding *binding,
     atomic_val_t prev = atomic_dec(&g_held_count);
     if (prev == 1) {
         raise_state(false);
+        zmk_mouse_gesture_runtime_set_suppress_cursor(false);
     } else if (prev <= 0) {
         /* Safety: shouldn't happen, but reset to 0 if it does. */
         atomic_set(&g_held_count, 0);
+        zmk_mouse_gesture_runtime_set_suppress_cursor(false);
     }
 
     return ZMK_BEHAVIOR_OPAQUE;
