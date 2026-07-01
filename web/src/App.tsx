@@ -184,6 +184,67 @@ function App() {
         [conn],
     );
 
+
+    const exportConfig = useCallback(() => {
+        const payload = {
+            format: "zmk-module-mouse-gesture-rpc.config",
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            gestures: data.gestures,
+            settings: data.settings,
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `mouse-gesture-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    }, [data]);
+
+    const importConfig = useCallback(() => {
+        if (conn.kind !== "connected") return;
+
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "application/json,.json";
+        input.onchange = async () => {
+            const file = input.files?.[0];
+            if (!file || conn.kind !== "connected") return;
+            if (!confirm("Import this file and replace all current mouse gestures?")) return;
+
+            setBusy(true);
+            setError(null);
+            try {
+                const text = await file.text();
+                const parsed = JSON.parse(text) as Partial<MouseGestureExport>;
+                const gestures = normalizeImportedGestures(parsed);
+
+                const current = await conn.client.listGestures();
+                for (const g of current) {
+                    await conn.client.deleteGesture(g.id);
+                }
+
+                if (parsed.settings) {
+                    await conn.client.setSettings(normalizeImportedSettings(parsed.settings));
+                }
+
+                for (const g of gestures) {
+                    await conn.client.addGesture({ ...g, id: 0 });
+                }
+
+                await reload();
+            } catch (e) {
+                setError(e instanceof Error ? e.message : String(e));
+            } finally {
+                setBusy(false);
+            }
+        };
+        input.click();
+    }, [conn, reload]);
+
     const fetchLog = useCallback(async () => {
         if (conn.kind !== "connected") return;
         setBusy(true);
@@ -226,6 +287,12 @@ function App() {
                             <div style={{ display: "flex", gap: 8 }}>
                                 <button className="btn" onClick={() => void reload()} disabled={busy}>
                                     ↻ Reload
+                                </button>
+                                <button className="btn" onClick={exportConfig} disabled={busy}>
+                                    Export
+                                </button>
+                                <button className="btn" onClick={importConfig} disabled={busy}>
+                                    Import
                                 </button>
                                 <button className="btn btn-danger" onClick={() => void onReset()} disabled={busy}>
                                     Reset
@@ -339,6 +406,58 @@ function App() {
             )}
         </div>
     );
+}
+
+interface MouseGestureExport {
+    format?: string;
+    version?: number;
+    exportedAt?: string;
+    gestures?: unknown;
+    settings?: unknown;
+}
+
+function normalizeImportedGestures(input: Partial<MouseGestureExport>): Gesture[] {
+    if (!Array.isArray(input.gestures)) {
+        throw new Error("Import file does not contain a gestures array.");
+    }
+
+    return input.gestures.map((raw, i) => {
+        const g = raw as Partial<Gesture>;
+        if (!g || typeof g !== "object") throw new Error(`Gesture ${i} is invalid.`);
+        if (!g.pattern || !Array.isArray(g.pattern.directions)) {
+            throw new Error(`Gesture ${i} has no pattern.directions array.`);
+        }
+        if (!g.binding || typeof g.binding.behavior !== "string") {
+            throw new Error(`Gesture ${i} has no binding.behavior.`);
+        }
+
+        return {
+            id: 0,
+            name: typeof g.name === "string" ? g.name : "",
+            pattern: {
+                directions: g.pattern.directions.map((d) => Number(d) as Direction),
+            },
+            binding: {
+                behavior: g.binding.behavior,
+                param1: Number(g.binding.param1 ?? 0),
+                param2: Number(g.binding.param2 ?? 0),
+            },
+            enabled: Boolean(g.enabled ?? true),
+            setId: Number(g.setId ?? 0),
+        };
+    });
+}
+
+function normalizeImportedSettings(input: unknown): Settings {
+    const s = input as Partial<Settings>;
+    return {
+        strokeSize: Number(s.strokeSize ?? 0),
+        idleTimeoutMs: Number(s.idleTimeoutMs ?? 0),
+        gestureCooldownMs: Number(s.gestureCooldownMs ?? 0),
+        movementThreshold: Number(s.movementThreshold ?? 0),
+        enableEagerMode: Boolean(s.enableEagerMode ?? false),
+        alwaysActive: Boolean(s.alwaysActive ?? false),
+    };
 }
 
 const NUM_GESTURE_KEYS = 3;
