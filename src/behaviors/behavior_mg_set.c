@@ -15,6 +15,8 @@
  */
 
 #define DT_DRV_COMPAT zmk_behavior_mg_set
+#define MG_SET_GENERIC_OK DT_HAS_COMPAT_STATUS_OKAY(zmk_behavior_mg_set)
+#define MG_SET_FIXED_OK DT_HAS_COMPAT_STATUS_OKAY(zmk_behavior_mg_set_fixed)
 
 #include <zephyr/device.h>
 #include <zephyr/logging/log.h>
@@ -32,7 +34,7 @@
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
-#if DT_HAS_COMPAT_STATUS_OKAY(DT_DRV_COMPAT)
+#if MG_SET_GENERIC_OK || MG_SET_FIXED_OK
 
 /* Global refcount of currently-held mg_set keys. Atomic for thread safety. */
 static atomic_t g_held_count;
@@ -147,6 +149,8 @@ static int behavior_mg_set_init(const struct device *dev) {
     return 0;
 }
 
+#if MG_SET_GENERIC_OK
+
 static const struct behavior_driver_api behavior_mg_set_driver_api = {
     /* The trackball and mouse-gesture input processor live on the central side.
      * In split builds, run &mg_set on central even when the key is pressed on
@@ -168,7 +172,7 @@ static const struct behavior_driver_api behavior_mg_set_driver_api = {
 
 DT_INST_FOREACH_STATUS_OKAY(MG_SET_INST)
 
-#endif /* DT_HAS_COMPAT_STATUS_OKAY(DT_DRV_COMPAT) */
+#endif /* MG_SET_GENERIC_OK */
 
 /* DYA/ZMK Studio friendly fixed aliases: &mg_set_0 / &mg_set_1 / &mg_set_2.
  * These use a separate zero-param compatible so Studio does not ask for an
@@ -177,7 +181,7 @@ DT_INST_FOREACH_STATUS_OKAY(MG_SET_INST)
 #undef DT_DRV_COMPAT
 #define DT_DRV_COMPAT zmk_behavior_mg_set_fixed
 
-#if DT_HAS_COMPAT_STATUS_OKAY(DT_DRV_COMPAT)
+#if MG_SET_FIXED_OK
 
 static const struct behavior_driver_api behavior_mg_set_fixed_driver_api = {
     .locality = BEHAVIOR_LOCALITY_CENTRAL,
@@ -195,5 +199,7 @@ static const struct behavior_driver_api behavior_mg_set_fixed_driver_api = {
 
 DT_INST_FOREACH_STATUS_OKAY(MG_SET_FIXED_INST)
 
-#endif /* DT_HAS_COMPAT_STATUS_OKAY(zmk_behavior_mg_set_fixed) */
+#endif /* MG_SET_FIXED_OK */
+
+#endif /* MG_SET_GENERIC_OK || MG_SET_FIXED_OK */
 
