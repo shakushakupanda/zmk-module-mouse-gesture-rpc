@@ -20,6 +20,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/atomic.h>
+#include <string.h>
 #include <drivers/behavior.h>
 
 #include <zmk/behavior.h>
@@ -74,10 +75,31 @@ static void raise_state(bool is_active) {
     });
 }
 
+static uint32_t binding_set_id(const struct zmk_behavior_binding *binding) {
+    uint32_t set_id = binding->param1;
+
+    /* DYA Studio may not preserve custom behavior params reliably.  Support
+     * zero-param aliases whose behavior device names end with _0/_1/_2, e.g.
+     * &mg_set_1.  The normal &mg_set N path still works and wins when param1
+     * is non-zero.
+     */
+    if (set_id == 0 && binding && binding->behavior_dev) {
+        size_t len = strlen(binding->behavior_dev);
+        if (len >= 2 && binding->behavior_dev[len - 2] == '_') {
+            char c = binding->behavior_dev[len - 1];
+            if (c >= '0' && c <= '2') {
+                set_id = (uint32_t)(c - '0');
+            }
+        }
+    }
+
+    return set_id;
+}
+
 static int on_pressed(struct zmk_behavior_binding *binding,
                       struct zmk_behavior_binding_event event) {
     ARG_UNUSED(event);
-    uint32_t set_id = binding->param1;
+    uint32_t set_id = binding_set_id(binding);
 
     mg_log_push(MG_LOG_MGSET_PRESSED, set_id, (uint32_t)atomic_get(&g_held_count));
 
@@ -101,7 +123,7 @@ static int on_released(struct zmk_behavior_binding *binding,
     ARG_UNUSED(event);
     ARG_UNUSED(binding);
 
-    mg_log_push(MG_LOG_MGSET_RELEASED, binding->param1,
+    mg_log_push(MG_LOG_MGSET_RELEASED, binding_set_id(binding),
                 (uint32_t)atomic_get(&g_held_count));
 
     /* If this was the last key held, turn matcher OFF (fires matched gesture). */

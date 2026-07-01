@@ -3,12 +3,26 @@
 #
 # Mouse-gesture set activation behavior.
 #
-# Param 1 selects which gesture set (0..MG_NUM_SETS-1) becomes active
-# while the key is held. On press, the firmware syncs that set's
-# gestures to kot149's runtime trie and raises the mouse_gesture state
-# ON event. On release, the state OFF event fires (with refcount so
-# overlapping presses behave naturally).
+# Supports both forms:
+#   &mg_set 1    // one-param generic behavior
+#   &mg_set_1    // zero-param DYA Studio friendly alias
+
 description: Mouse gesture set activation behavior
 compatible: "zmk,behavior-mg-set"
 
-include: one_param.yaml
+include: behavior-metadata.yaml
+
+properties:
+  label:
+    type: string
+    required: false
+    deprecated: true
+  "#binding-cells":
+    type: int
+    required: true
+    enum:
+      - 0
+      - 1
+
+binding-cells:
+  - param1
