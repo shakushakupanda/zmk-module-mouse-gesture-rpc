@@ -51,6 +51,11 @@ function App() {
     const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
     const [logVisible, setLogVisible] = useState(false);
 
+    const nonGridGestures = useMemo(
+        () => data.gestures.filter((g) => !isGridGesture(g)),
+        [data.gestures],
+    );
+
     const connect = useCallback(async () => {
         setConn({ kind: "connecting" });
         setError(null);
@@ -243,11 +248,17 @@ function App() {
                             }}
                         />
 
-                        {data.gestures.length === 0 ? (
+                        {data.gestures.length === 0 && (
                             <div className="empty-state">{busy ? "Loading…" : "No gestures configured."}</div>
-                        ) : (
+                        )}
+
+                        {nonGridGestures.length > 0 && (
                             <div className="gesture-list">
-                                {data.gestures.map((g) => (
+                                <h3 className="subhead">Other gestures</h3>
+                                <p className="muted">
+                                    These gestures do not fit the 3 keys × 4 single-direction grid, so they are shown separately.
+                                </p>
+                                {nonGridGestures.map((g) => (
                                     <div className="gesture-row" key={g.id}>
                                         <div>
                                             <div className="gesture-name">{g.name || `#${g.id}`}</div>
@@ -350,6 +361,13 @@ function findGestureInCell(gestures: Gesture[], setId: number, dir: Direction): 
         g.pattern.directions.length === 1 &&
         g.pattern.directions[0] === dir,
     ) ?? null;
+}
+
+function isGridGesture(g: Gesture): boolean {
+    return g.setId >= 0 &&
+        g.setId < NUM_GESTURE_KEYS &&
+        g.pattern.directions.length === 1 &&
+        GRID_DIRECTIONS.includes(g.pattern.directions[0] as typeof GRID_DIRECTIONS[number]);
 }
 
 // === Subcomponents =====================================================

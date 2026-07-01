@@ -543,3 +543,10 @@
 .gesture-list {
     margin-top: 14px;
 }
+
+.subhead {
+    margin: 12px 0 4px;
+    font-size: 0.9rem;
+    color: var(--color-text);
+    font-weight: 600;
+}
