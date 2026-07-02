@@ -15,6 +15,8 @@
 #include <errno.h>
 #include <limits.h>
 #include <drivers/input_processor.h>
+#include <zmk/endpoints.h>
+#include <zmk/hid.h>
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -41,7 +43,6 @@ struct inertial_scroll_config {
 struct inertial_scroll_data {
     struct k_work_delayable work;
     const struct device *dev;
-    const struct device *input_dev;
     struct zmk_inertial_scroll_settings settings;
     int32_t velocity[2];
     uint8_t ticks;
@@ -72,6 +73,8 @@ static void inertial_scroll_work_cb(struct k_work *work) {
     }
 
     bool keep_running = false;
+    int16_t scroll_x = 0;
+    int16_t scroll_y = 0;
     data->ticks++;
     data->injecting = true;
 
@@ -87,12 +90,22 @@ static void inertial_scroll_work_cb(struct k_work *work) {
             out = v > 0 ? 1 : -1;
         }
 
-        input_report_rel(data->input_dev ? data->input_dev : dev, cfg->codes[i], out, true, K_NO_WAIT);
+        if (cfg->codes[i] == INPUT_REL_WHEEL) {
+            scroll_y += out;
+        } else if (cfg->codes[i] == INPUT_REL_HWHEEL) {
+            scroll_x += out;
+        }
 
         data->velocity[i] = (v * st.decay_percent) / 100;
         if (ABS(data->velocity[i]) >= st.min_velocity_q8) {
             keep_running = true;
         }
+    }
+
+    if (scroll_x != 0 || scroll_y != 0) {
+        zmk_hid_mouse_scroll_set(scroll_x, scroll_y);
+        zmk_endpoints_send_mouse_report();
+        zmk_hid_mouse_scroll_set(0, 0);
     }
 
     data->injecting = false;
@@ -121,7 +134,6 @@ static int inertial_scroll_handle_event(const struct device *dev, struct input_e
         return ZMK_INPUT_PROC_CONTINUE;
     }
 
-    data->input_dev = event->dev;
     data->velocity[idx] = ((int32_t)event->value * (int32_t)data->settings.impulse_percent * Q_ONE) / 100;
     data->ticks = 0;
 
