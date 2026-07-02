@@ -47,6 +47,14 @@ message Settings {
     uint32 movement_threshold = 4;     // ignore deltas below this (default 0)
     bool enable_eager_mode = 5;        // invoke on match without waiting for idle
     bool always_active = 6;            // skip activation-key gating
+
+    bool inertial_scroll_enabled = 7;
+    uint32 inertial_scroll_tick_ms = 8;
+    uint32 inertial_scroll_idle_ms = 9;
+    uint32 inertial_scroll_decay_percent = 10;
+    uint32 inertial_scroll_impulse_percent = 11;
+    uint32 inertial_scroll_min_velocity_q8 = 12;
+    uint32 inertial_scroll_max_ticks = 13;
 }
 
 // Phase 5 debug aid: each breadcrumb entry recorded by the firmware.

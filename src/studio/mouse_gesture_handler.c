@@ -234,6 +234,13 @@ static int handle_get_settings(
     out.settings.movement_threshold  = cur.movement_threshold;
     out.settings.enable_eager_mode   = cur.enable_eager_mode;
     out.settings.always_active       = cur.always_active;
+    out.settings.inertial_scroll_enabled = cur.inertial_scroll_enabled;
+    out.settings.inertial_scroll_tick_ms = cur.inertial_scroll_tick_ms;
+    out.settings.inertial_scroll_idle_ms = cur.inertial_scroll_idle_ms;
+    out.settings.inertial_scroll_decay_percent = cur.inertial_scroll_decay_percent;
+    out.settings.inertial_scroll_impulse_percent = cur.inertial_scroll_impulse_percent;
+    out.settings.inertial_scroll_min_velocity_q8 = cur.inertial_scroll_min_velocity_q8;
+    out.settings.inertial_scroll_max_ticks = cur.inertial_scroll_max_ticks;
     resp->which_response_type = zmk_mouse_gesture_Response_settings_tag;
     resp->response_type.settings = out;
     return 0;
@@ -253,6 +260,13 @@ static int handle_set_settings(
         .movement_threshold  = req->settings.movement_threshold,
         .enable_eager_mode   = req->settings.enable_eager_mode,
         .always_active       = req->settings.always_active,
+        .inertial_scroll_enabled = req->settings.inertial_scroll_enabled,
+        .inertial_scroll_tick_ms = req->settings.inertial_scroll_tick_ms,
+        .inertial_scroll_idle_ms = req->settings.inertial_scroll_idle_ms,
+        .inertial_scroll_decay_percent = req->settings.inertial_scroll_decay_percent,
+        .inertial_scroll_impulse_percent = req->settings.inertial_scroll_impulse_percent,
+        .inertial_scroll_min_velocity_q8 = req->settings.inertial_scroll_min_velocity_q8,
+        .inertial_scroll_max_ticks = req->settings.inertial_scroll_max_ticks,
     };
     int rc = mg_settings_set(&ns);
     if (rc) { set_error(resp, "set_settings failed"); return 0; }

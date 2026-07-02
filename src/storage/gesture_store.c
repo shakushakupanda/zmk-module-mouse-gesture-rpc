@@ -45,7 +45,46 @@ static struct mg_settings g_settings = {
     .movement_threshold  = 0,
     .enable_eager_mode   = false,
     .always_active       = false,
+
+    .inertial_scroll_enabled         = true,
+    .inertial_scroll_tick_ms         = 20,
+    .inertial_scroll_idle_ms         = 28,
+    .inertial_scroll_decay_percent   = 86,
+    .inertial_scroll_impulse_percent = 180,
+    .inertial_scroll_min_velocity_q8 = 96,
+    .inertial_scroll_max_ticks       = 36,
 };
+
+struct zmk_inertial_scroll_settings {
+    bool enabled;
+    uint16_t tick_ms;
+    uint16_t idle_ms;
+    uint8_t decay_percent;
+    uint16_t impulse_percent;
+    uint16_t min_velocity_q8;
+    uint8_t max_ticks;
+};
+
+__weak int zmk_inertial_scroll_runtime_set(const struct zmk_inertial_scroll_settings *settings) {
+    ARG_UNUSED(settings);
+    return -ENOTSUP;
+}
+
+static void apply_inertial_scroll_settings(void) {
+    struct zmk_inertial_scroll_settings s = {
+        .enabled = g_settings.inertial_scroll_enabled,
+        .tick_ms = CLAMP(g_settings.inertial_scroll_tick_ms, 1, UINT16_MAX),
+        .idle_ms = CLAMP(g_settings.inertial_scroll_idle_ms, 0, UINT16_MAX),
+        .decay_percent = CLAMP(g_settings.inertial_scroll_decay_percent, 1, 99),
+        .impulse_percent = CLAMP(g_settings.inertial_scroll_impulse_percent, 0, UINT16_MAX),
+        .min_velocity_q8 = CLAMP(g_settings.inertial_scroll_min_velocity_q8, 1, UINT16_MAX),
+        .max_ticks = CLAMP(g_settings.inertial_scroll_max_ticks, 0, UINT8_MAX),
+    };
+    int rc = zmk_inertial_scroll_runtime_set(&s);
+    if (rc && rc != -ENOTSUP && rc != -ENODEV) {
+        LOG_WRN("mg_store: inertial scroll apply failed: %d", rc);
+    }
+}
 
 /* === kot149 trie sync storage =========================================
  * These arrays back the runtime gesture set we push to kot149's input
@@ -366,6 +405,7 @@ int mg_store_init(void) {
     g_active_set = 0;
 
     (void)settings_load_subtree("cmg");
+    apply_inertial_scroll_settings();
 
     if (!g_loaded || g_count == 0) {
         LOG_INF("mg_store: no saved data, seeding from DTS defaults (n=%u)",
@@ -501,6 +541,8 @@ int mg_settings_set(const struct mg_settings *s) {
     int rc = settings_save_one("cmg/settings", &g_settings, sizeof(g_settings));
     if (rc) {
         LOG_WRN("mg_store: save settings failed: %d", rc);
+    } else {
+        apply_inertial_scroll_settings();
     }
     return rc;
 }

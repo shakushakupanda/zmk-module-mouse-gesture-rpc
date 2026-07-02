@@ -97,6 +97,14 @@ struct mg_settings {
     uint32_t movement_threshold;  /* ignore deltas below this (default 0) */
     bool     enable_eager_mode;
     bool     always_active;
+
+    bool     inertial_scroll_enabled;
+    uint32_t inertial_scroll_tick_ms;
+    uint32_t inertial_scroll_idle_ms;
+    uint32_t inertial_scroll_decay_percent;
+    uint32_t inertial_scroll_impulse_percent;
+    uint32_t inertial_scroll_min_velocity_q8;
+    uint32_t inertial_scroll_max_ticks;
 };
 
 /* Read the current settings (post-NVS-load) into *out. */
