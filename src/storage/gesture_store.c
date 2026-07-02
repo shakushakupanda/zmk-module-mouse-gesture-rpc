@@ -13,6 +13,7 @@
 #include "log_ring.h"
 
 #include <errno.h>
+#include <stdint.h>
 #include <string.h>
 
 #include <zephyr/devicetree.h>
@@ -25,6 +26,10 @@
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+#ifndef __weak
+#define __weak __attribute__((weak))
+#endif
 
 /* === Runtime array =================================================== */
 
