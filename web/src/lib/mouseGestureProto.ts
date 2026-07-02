@@ -56,6 +56,13 @@ export interface Settings {
     movementThreshold: number;
     enableEagerMode: boolean;
     alwaysActive: boolean;
+    inertialScrollEnabled: boolean;
+    inertialScrollTickMs: number;
+    inertialScrollIdleMs: number;
+    inertialScrollDecayPercent: number;
+    inertialScrollImpulsePercent: number;
+    inertialScrollMinVelocityQ8: number;
+    inertialScrollMaxTicks: number;
 }
 
 export interface LogEntry {
@@ -166,6 +173,13 @@ function encodeSettings(s: Settings): Uint8Array {
     if (s.movementThreshold !== 0) parts.push(encodeVarintField(4, s.movementThreshold));
     if (s.enableEagerMode) parts.push(encodeBoolField(5, s.enableEagerMode));
     if (s.alwaysActive) parts.push(encodeBoolField(6, s.alwaysActive));
+    if (s.inertialScrollEnabled) parts.push(encodeBoolField(7, s.inertialScrollEnabled));
+    if (s.inertialScrollTickMs !== 0) parts.push(encodeVarintField(8, s.inertialScrollTickMs));
+    if (s.inertialScrollIdleMs !== 0) parts.push(encodeVarintField(9, s.inertialScrollIdleMs));
+    if (s.inertialScrollDecayPercent !== 0) parts.push(encodeVarintField(10, s.inertialScrollDecayPercent));
+    if (s.inertialScrollImpulsePercent !== 0) parts.push(encodeVarintField(11, s.inertialScrollImpulsePercent));
+    if (s.inertialScrollMinVelocityQ8 !== 0) parts.push(encodeVarintField(12, s.inertialScrollMinVelocityQ8));
+    if (s.inertialScrollMaxTicks !== 0) parts.push(encodeVarintField(13, s.inertialScrollMaxTicks));
     return concat(...parts);
 }
 
@@ -177,6 +191,13 @@ function decodeSettings(buf: Uint8Array): Settings {
         movementThreshold: 0,
         enableEagerMode: false,
         alwaysActive: false,
+        inertialScrollEnabled: true,
+        inertialScrollTickMs: 20,
+        inertialScrollIdleMs: 28,
+        inertialScrollDecayPercent: 86,
+        inertialScrollImpulsePercent: 180,
+        inertialScrollMinVelocityQ8: 96,
+        inertialScrollMaxTicks: 36,
     };
     for (const f of walkFields(buf)) {
         if (f.field === 1 && f.value !== undefined) out.strokeSize = f.value;
@@ -185,6 +206,13 @@ function decodeSettings(buf: Uint8Array): Settings {
         else if (f.field === 4 && f.value !== undefined) out.movementThreshold = f.value;
         else if (f.field === 5 && f.value !== undefined) out.enableEagerMode = f.value !== 0;
         else if (f.field === 6 && f.value !== undefined) out.alwaysActive = f.value !== 0;
+        else if (f.field === 7 && f.value !== undefined) out.inertialScrollEnabled = f.value !== 0;
+        else if (f.field === 8 && f.value !== undefined) out.inertialScrollTickMs = f.value;
+        else if (f.field === 9 && f.value !== undefined) out.inertialScrollIdleMs = f.value;
+        else if (f.field === 10 && f.value !== undefined) out.inertialScrollDecayPercent = f.value;
+        else if (f.field === 11 && f.value !== undefined) out.inertialScrollImpulsePercent = f.value;
+        else if (f.field === 12 && f.value !== undefined) out.inertialScrollMinVelocityQ8 = f.value;
+        else if (f.field === 13 && f.value !== undefined) out.inertialScrollMaxTicks = f.value;
     }
     return out;
 }

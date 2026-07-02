@@ -394,6 +394,13 @@ function normalizeImportedSettings(input: unknown): Settings {
         movementThreshold: Number(s.movementThreshold ?? 0),
         enableEagerMode: Boolean(s.enableEagerMode ?? false),
         alwaysActive: Boolean(s.alwaysActive ?? false),
+        inertialScrollEnabled: Boolean(s.inertialScrollEnabled ?? true),
+        inertialScrollTickMs: Number(s.inertialScrollTickMs ?? 20),
+        inertialScrollIdleMs: Number(s.inertialScrollIdleMs ?? 28),
+        inertialScrollDecayPercent: Number(s.inertialScrollDecayPercent ?? 86),
+        inertialScrollImpulsePercent: Number(s.inertialScrollImpulsePercent ?? 180),
+        inertialScrollMinVelocityQ8: Number(s.inertialScrollMinVelocityQ8 ?? 96),
+        inertialScrollMaxTicks: Number(s.inertialScrollMaxTicks ?? 36),
     };
 }
 
@@ -745,10 +752,47 @@ function SettingsCard({
                     onChange={(v) => setDraft({ ...draft, alwaysActive: v })}
                 />
             </div>
+
+            <h3 className="settings-subhead">Inertial scroll</h3>
+            <div className="settings-grid">
+                <BoolField
+                    label="Inertial scroll"
+                    value={draft.inertialScrollEnabled}
+                    onChange={(v) => setDraft({ ...draft, inertialScrollEnabled: v })}
+                />
+                <NumberField
+                    label="Tick interval (ms)"
+                    value={draft.inertialScrollTickMs}
+                    onChange={(v) => setDraft({ ...draft, inertialScrollTickMs: v })}
+                />
+                <NumberField
+                    label="Start delay (ms)"
+                    value={draft.inertialScrollIdleMs}
+                    onChange={(v) => setDraft({ ...draft, inertialScrollIdleMs: v })}
+                />
+                <NumberField
+                    label="Decay (%)"
+                    value={draft.inertialScrollDecayPercent}
+                    onChange={(v) => setDraft({ ...draft, inertialScrollDecayPercent: v })}
+                />
+                <NumberField
+                    label="Impulse (%)"
+                    value={draft.inertialScrollImpulsePercent}
+                    onChange={(v) => setDraft({ ...draft, inertialScrollImpulsePercent: v })}
+                />
+                <NumberField
+                    label="Min velocity (q8)"
+                    value={draft.inertialScrollMinVelocityQ8}
+                    onChange={(v) => setDraft({ ...draft, inertialScrollMinVelocityQ8: v })}
+                />
+                <NumberField
+                    label="Max ticks"
+                    value={draft.inertialScrollMaxTicks}
+                    onChange={(v) => setDraft({ ...draft, inertialScrollMaxTicks: v })}
+                />
+            </div>
             <p className="muted" style={{ marginTop: 12 }}>
-                Note: only <code>stroke_size</code> / <code>idle_timeout_ms</code> / <code>gesture_cooldown_ms</code> are
-                currently honored by the kot149 input processor (read from DTS at boot; runtime sync is pending). The
-                other flags are stored but not yet plumbed.
+                Lower decay stops sooner. Higher impulse carries the scroll farther. Set Inertial scroll off to disable it completely.
             </p>
         </section>
     );

@@ -175,6 +175,12 @@
 }
 
 /* Settings grid */
+.settings-subhead {
+    margin: 18px 0 10px;
+    color: var(--color-text);
+    font-size: 0.9rem;
+    font-weight: 700;
+}
 .settings-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
