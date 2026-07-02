@@ -578,14 +578,22 @@
     line-height: 1;
 }
 .direction-name {
-    color: var(--color-text);
+    color: var(--color-text-muted);
+    font-size: 0.74rem;
     font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
 }
 .direction-binding {
     max-width: 100%;
-    color: var(--color-text-muted);
-    font-size: 0.78rem;
+    color: var(--color-text);
+    font-size: 0.96rem;
+    font-weight: 750;
+    line-height: 1.25;
     word-break: break-word;
+}
+.trackball-direction.configured .direction-binding {
+    color: var(--color-purple);
 }
 .gesture-direction-up { top: 0; left: 50%; transform: translateX(-50%); }
 .gesture-direction-up:hover:not(:disabled) { transform: translateX(-50%) translateY(-1px); }

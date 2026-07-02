@@ -17,7 +17,6 @@ import {
 } from "./lib/mouseGestureProto";
 import {
     LOG_CODE_NAMES,
-    bindingToString,
     parseIntLoose,
     patternToArrows,
 } from "./lib/patternFormat";
@@ -635,17 +634,57 @@ function BindingLabel({
     param1: number;
     param2: number;
 }) {
-    const shortcut = describeEncoded(param1);
-    const raw = bindingToString(behavior, param1, param2);
-    if (shortcut) {
-        return (
-            <span>
-                <span style={{ color: "var(--color-purple)" }}>{shortcut}</span>
-                <span style={{ marginLeft: 8, color: "var(--color-text-muted)" }}>{raw}</span>
-            </span>
-        );
+    return <span>{bindingDisplayName(behavior, param1, param2)}</span>;
+}
+
+function bindingDisplayName(behavior: string, param1: number, param2: number): string {
+    const normalized = behavior.trim();
+    const isKeyPress = normalized === "key_press" || normalized === "kp";
+    if (isKeyPress) {
+        return describeZmkUsage(param1) ?? describeEncoded(param1) ?? "Key press";
     }
-    return <span>{raw}</span>;
+
+    const behaviorNames: Record<string, string> = {
+        mo: "Momentary layer",
+        tog: "Toggle layer",
+        to: "Switch layer",
+        bt: "Bluetooth",
+        ext_power: "External power",
+        rgb_ug: "RGB",
+        reset: "Reset",
+        bootloader: "Bootloader",
+        trans: "Transparent",
+        none: "None",
+    };
+    if (behaviorNames[normalized]) {
+        if (normalized === "mo" || normalized === "tog" || normalized === "to") {
+            return `${behaviorNames[normalized]} ${param1}`;
+        }
+        return behaviorNames[normalized];
+    }
+
+    if (!normalized) return "Unassigned";
+    if (param1 === 0 && param2 === 0) return normalized;
+    return normalized.replace(/^&/, "");
+}
+
+function describeZmkUsage(value: number): string | null {
+    const usage = value & 0x00ffffff;
+    const consumerNames: Record<number, string> = {
+        0x0c00b5: "Next Track",
+        0x0c00b6: "Previous Track",
+        0x0c00b7: "Stop",
+        0x0c00cd: "Play / Pause",
+        0x0c00e2: "Mute",
+        0x0c00e9: "Volume Up",
+        0x0c00ea: "Volume Down",
+        0x0c0223: "Home",
+        0x0c0224: "Back",
+        0x0c0225: "Forward",
+        0x0c0226: "Stop Loading",
+        0x0c0227: "Refresh",
+    };
+    return consumerNames[usage] ?? null;
 }
 
 function SettingsCard({
