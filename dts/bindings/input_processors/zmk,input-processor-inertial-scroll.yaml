@@ -17,8 +17,7 @@ properties:
     description: Enable inertial scroll by default.
   codes:
     type: array
-    required: true
-    description: Relative scroll codes to apply inertia to, usually WHEEL and HWHEEL.
+    description: Deprecated/ignored. Inertial scroll currently applies to WHEEL and HWHEEL.
   tick-ms:
     type: int
     default: 20
