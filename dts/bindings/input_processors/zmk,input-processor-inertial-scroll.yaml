@@ -1,0 +1,41 @@
+# Copyright (c) 2026
+# SPDX-License-Identifier: MIT
+
+description: Input processor that adds decaying inertial scroll after wheel movement
+
+compatible: "zmk,input-processor-inertial-scroll"
+
+include: ip_zero_param.yaml
+
+properties:
+  enabled:
+    type: boolean
+    description: Enable inertial scroll by default.
+  codes:
+    type: array
+    required: true
+    description: Relative scroll codes to apply inertia to, usually WHEEL and HWHEEL.
+  tick-ms:
+    type: int
+    default: 20
+    description: Period between inertial scroll ticks in milliseconds.
+  idle-ms:
+    type: int
+    default: 24
+    description: Delay after the last real scroll event before inertia starts.
+  decay-percent:
+    type: int
+    default: 86
+    description: Velocity multiplier applied every tick, in percent.
+  impulse-percent:
+    type: int
+    default: 180
+    description: How much of the last real scroll value becomes inertial velocity.
+  min-velocity-q8:
+    type: int
+    default: 96
+    description: Stop when absolute fixed-point velocity falls below this threshold.
+  max-ticks:
+    type: int
+    default: 36
+    description: Safety cap for one inertial run.
