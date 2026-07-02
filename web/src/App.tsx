@@ -763,13 +763,41 @@ function NumberField({
     value: number;
     onChange: (v: number) => void;
 }) {
+    const [text, setText] = useState(String(value));
+
+    useEffect(() => {
+        setText(String(value));
+    }, [value]);
+
+    const commit = (next: string) => {
+        if (next.trim() === "") return;
+        const parsed = Number(next);
+        if (Number.isFinite(parsed)) {
+            onChange(Math.max(0, Math.trunc(parsed)));
+        }
+    };
+
     return (
         <div className="field">
             <label>{label}</label>
             <input
-                type="number"
-                value={value}
-                onChange={(e) => onChange(parseInt(e.target.value || "0", 10))}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={text}
+                onChange={(e) => {
+                    const next = e.target.value;
+                    if (!/^\d*$/.test(next)) return;
+                    setText(next);
+                    commit(next);
+                }}
+                onBlur={() => {
+                    if (text.trim() === "") {
+                        setText(String(value));
+                    } else {
+                        commit(text);
+                    }
+                }}
             />
         </div>
     );
