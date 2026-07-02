@@ -455,114 +455,18 @@
     background: currentColor;
 }
 
-/* Gesture key × direction grid */
-.gesture-grid-wrap {
-    overflow-x: auto;
-    margin: 14px 0 18px;
-    border: 1px solid var(--color-border);
-    border-radius: 12px;
-}
-.gesture-grid-table {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 680px;
-}
-.gesture-grid-table th,
-.gesture-grid-table td {
-    border-bottom: 1px solid var(--color-border);
-    border-right: 1px solid var(--color-border);
-    padding: 8px;
-    vertical-align: stretch;
-}
-.gesture-grid-table th:last-child,
-.gesture-grid-table td:last-child { border-right: 0; }
-.gesture-grid-table tr:last-child th,
-.gesture-grid-table tr:last-child td { border-bottom: 0; }
-.gesture-grid-table thead th {
-    background: var(--color-bg-soft);
-    color: var(--color-text-muted);
-    font-size: 0.78rem;
-    font-weight: 600;
-    text-align: center;
-}
-.gesture-grid-table tbody th {
-    width: 128px;
-    background: var(--color-bg-soft);
-    text-align: left;
-}
-.set-label {
-    color: var(--color-text);
-    font-weight: 600;
-    margin-bottom: 4px;
-}
-.gesture-cell {
-    width: 100%;
-    min-height: 78px;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
-    gap: 4px;
-    border-radius: 10px;
-    border: 1px dashed var(--color-border-strong);
-    background: var(--color-bg-elev);
-    color: var(--color-text-muted);
-    cursor: pointer;
-    text-align: left;
-    padding: 10px;
-    transition: all 0.12s ease;
-}
-.gesture-cell:hover:not(:disabled) {
-    border-color: var(--color-blue);
-    background: var(--color-blue-bg);
-    color: var(--color-blue);
-}
-.gesture-cell.configured {
-    border-style: solid;
-    border-color: rgba(91, 158, 239, 0.35);
-    background: var(--color-blue-bg);
-    color: var(--color-text);
-}
-.cell-name {
-    font-weight: 600;
-    color: var(--color-text);
-}
-.cell-binding {
-    font-size: 0.78rem;
-    color: var(--color-text-muted);
-    word-break: break-word;
-}
-.cell-empty {
-    font-size: 0.82rem;
-    font-weight: 500;
-}
-.cell-disabled {
-    font-size: 0.72rem;
-    color: var(--color-danger);
-}
-.gesture-list {
-    margin-top: 14px;
-}
-
-.subhead {
-    margin: 12px 0 4px;
-    font-size: 0.9rem;
-    color: var(--color-text);
-    font-weight: 600;
-}
-
-/* Trackball gesture illustration */
+/* Trackball gesture editor */
 .trackball-gesture-hero {
     display: grid;
-    grid-template-columns: minmax(180px, 1fr) minmax(260px, 420px);
-    gap: 18px;
+    grid-template-columns: minmax(220px, 0.9fr) minmax(360px, 1.4fr);
+    gap: 20px;
     align-items: center;
     margin: 14px 0 16px;
-    padding: 16px 18px;
+    padding: 18px;
     border: 1px solid var(--color-border);
-    border-radius: 14px;
+    border-radius: 16px;
     background:
-        radial-gradient(circle at 74% 50%, rgba(0, 211, 194, 0.12), transparent 30%),
+        radial-gradient(circle at 72% 48%, rgba(91, 158, 239, 0.16), transparent 34%),
         linear-gradient(135deg, var(--color-bg-soft), var(--color-bg-elev));
 }
 .trackball-title {
@@ -576,67 +480,145 @@
     font-size: 0.86rem;
     line-height: 1.55;
 }
+.gesture-key-tabs {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 14px;
+}
+.gesture-key-tab {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-bg-elev);
+    color: var(--color-text-muted);
+    font-weight: 650;
+    transition: all 0.12s ease;
+}
+.gesture-key-tab:hover:not(:disabled),
+.gesture-key-tab.active {
+    border-color: rgba(91, 158, 239, 0.45);
+    background: var(--color-blue-bg);
+    color: var(--color-blue);
+}
 .trackball-art-wrap {
     position: relative;
-    min-height: 220px;
+    min-height: 360px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .trackball-art {
-    width: min(100%, 310px);
+    width: min(42vw, 210px);
+    min-width: 160px;
     height: auto;
     overflow: visible;
+    filter: drop-shadow(0 18px 26px rgba(31, 41, 55, 0.22));
+    pointer-events: none;
 }
-.trackball-shadow {
-    fill: rgba(0, 0, 0, 0.28);
-    transform: translate(4px, 7px);
-}
-.trackball-body {
-    fill: url(#bodyGradient);
-    stroke: rgba(255, 255, 255, 0.08);
-    stroke-width: 1.2;
+.trackball-ball-shadow {
+    fill: rgba(31, 41, 55, 0.22);
+    transform: translate(8px, 10px);
 }
 .trackball-ball {
     fill: url(#ballGradient);
-    stroke: rgba(255, 255, 255, 0.12);
-    stroke-width: 1;
+    stroke: rgba(255, 255, 255, 0.55);
+    stroke-width: 1.2;
 }
 .trackball-highlight {
-    fill: rgba(255, 255, 255, 0.18);
+    fill: rgba(255, 255, 255, 0.24);
 }
 .trackball-button {
     fill: none;
     stroke: var(--color-blue);
-    stroke-width: 3;
+    stroke-width: 5;
 }
-.trackball-seam {
-    fill: none;
-    stroke: rgba(0, 0, 0, 0.28);
-    stroke-width: 2;
-    stroke-linecap: round;
-}
-.trackball-arrows path {
-    fill: none;
-    stroke: var(--color-text);
-    stroke-width: 4;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    opacity: 0.92;
-}
-.gesture-label {
+.trackball-direction {
     position: absolute;
-    color: var(--color-blue);
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.25);
+    z-index: 1;
+    width: 170px;
+    min-height: 78px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 3px;
+    padding: 11px 13px;
+    border-radius: 14px;
+    border: 1px dashed var(--color-border-strong);
+    background: rgba(255, 255, 255, 0.78);
+    color: var(--color-text-muted);
+    box-shadow: 0 10px 24px rgba(31, 41, 55, 0.06);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    text-align: left;
+    transition: all 0.12s ease;
 }
-.gesture-label-up { top: 4px; left: 50%; transform: translateX(-50%); }
-.gesture-label-right { right: 8px; top: 50%; transform: translateY(-50%); }
-.gesture-label-down { bottom: 2px; left: 50%; transform: translateX(-50%); }
-.gesture-label-left { left: 8px; top: 50%; transform: translateY(-50%); }
-@media (max-width: 760px) {
+.trackball-direction:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: var(--color-blue);
+    background: #ffffff;
+    box-shadow: 0 14px 32px rgba(91, 158, 239, 0.16);
+}
+.trackball-direction.configured {
+    border-style: solid;
+    border-color: rgba(91, 158, 239, 0.45);
+    background: rgba(232, 241, 252, 0.92);
+}
+.direction-arrow {
+    position: absolute;
+    top: 9px;
+    right: 12px;
+    color: var(--color-blue);
+    font-size: 1.25rem;
+    line-height: 1;
+}
+.direction-name {
+    color: var(--color-text);
+    font-weight: 700;
+}
+.direction-binding {
+    max-width: 100%;
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    word-break: break-word;
+}
+.gesture-direction-up { top: 0; left: 50%; transform: translateX(-50%); }
+.gesture-direction-up:hover:not(:disabled) { transform: translateX(-50%) translateY(-1px); }
+.gesture-direction-right { right: 0; top: 50%; transform: translateY(-50%); }
+.gesture-direction-right:hover:not(:disabled) { transform: translateY(calc(-50% - 1px)); }
+.gesture-direction-down { bottom: 0; left: 50%; transform: translateX(-50%); }
+.gesture-direction-down:hover:not(:disabled) { transform: translateX(-50%) translateY(-1px); }
+.gesture-direction-left { left: 0; top: 50%; transform: translateY(-50%); }
+.gesture-direction-left:hover:not(:disabled) { transform: translateY(calc(-50% - 1px)); }
+
+@media (max-width: 860px) {
     .trackball-gesture-hero { grid-template-columns: 1fr; }
-    .trackball-art-wrap { min-height: 190px; }
+    .trackball-art-wrap { min-height: 430px; }
+}
+@media (max-width: 620px) {
+    .trackball-art-wrap {
+        min-height: auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        padding-top: 190px;
+    }
+    .trackball-art {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 170px;
+    }
+    .trackball-direction {
+        position: static;
+        width: 100%;
+        min-height: 72px;
+        transform: none !important;
+    }
 }

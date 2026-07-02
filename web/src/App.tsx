@@ -6,7 +6,7 @@
  * speaks the same ZMK Studio protocol as DYA Studio / mg_cli.py.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import "./App.css";
 import { MouseGestureClient } from "./lib/mouseGestureClient";
 import {
@@ -50,11 +50,7 @@ function App() {
     const [adding, setAdding] = useState<Gesture | null>(null);
     const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
     const [logVisible, setLogVisible] = useState(false);
-
-    const nonGridGestures = useMemo(
-        () => data.gestures.filter((g) => !isGridGesture(g)),
-        [data.gestures],
-    );
+    const [activeGestureKey, setActiveGestureKey] = useState(0);
 
     const connect = useCallback(async () => {
         setConn({ kind: "connecting" });
@@ -124,24 +120,6 @@ function App() {
             try {
                 await conn.client.updateGesture(g);
                 setEditing(null);
-                await reload();
-            } catch (e) {
-                setError(e instanceof Error ? e.message : String(e));
-            } finally {
-                setBusy(false);
-            }
-        },
-        [conn, reload],
-    );
-
-    const onDelete = useCallback(
-        async (id: number) => {
-            if (conn.kind !== "connected") return;
-            if (!confirm(`Delete gesture #${id}?`)) return;
-            setBusy(true);
-            setError(null);
-            try {
-                await conn.client.deleteGesture(id);
                 await reload();
             } catch (e) {
                 setError(e instanceof Error ? e.message : String(e));
@@ -303,13 +281,14 @@ function App() {
                             </div>
                         </div>
                         <p className="muted" style={{ marginTop: 0 }}>
-                            Each row is a gesture key ID (<code>&amp;mg_set N</code>). Each column is the direction stroked while holding that gesture key.
+                            Select a gesture key, then click the direction around the ball that you want to assign.
                         </p>
-                        <TrackballGestureIllustration />
-                        <GestureGrid
+                        <TrackballGestureIllustration
                             gestures={data.gestures}
+                            activeSetId={activeGestureKey}
+                            onActiveSetChange={setActiveGestureKey}
                             busy={busy}
-                            onCellClick={(setId, dir) => {
+                            onDirectionClick={(setId, dir) => {
                                 const existing = findGestureInCell(data.gestures, setId, dir);
                                 if (existing) setEditing(existing);
                                 else setAdding(blankGesture(setId, dir));
@@ -317,49 +296,7 @@ function App() {
                         />
 
                         {data.gestures.length === 0 && (
-                            <div className="empty-state">{busy ? "Loading…" : "No gestures configured."}</div>
-                        )}
-
-                        {nonGridGestures.length > 0 && (
-                            <div className="gesture-list">
-                                <h3 className="subhead">Other gestures</h3>
-                                <p className="muted">
-                                    These gestures do not fit the 3 keys × 4 single-direction grid, so they are shown separately.
-                                </p>
-                                {nonGridGestures.map((g) => (
-                                    <div className="gesture-row" key={g.id}>
-                                        <div>
-                                            <div className="gesture-name">{g.name || `#${g.id}`}</div>
-                                            <div className="gesture-id">
-                                                id {g.id} · gesture key {g.setId}
-                                                {!g.enabled ? " · disabled" : ""}
-                                            </div>
-                                        </div>
-                                        <div className="pattern-display">
-                                            {patternToArrows(g.pattern.directions)}
-                                        </div>
-                                        <div className="binding-display">
-                                            <BindingLabel
-                                                behavior={g.binding.behavior}
-                                                param1={g.binding.param1}
-                                                param2={g.binding.param2}
-                                            />
-                                        </div>
-                                        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                                            <button className="btn" onClick={() => setEditing(g)} disabled={busy}>
-                                                Edit
-                                            </button>
-                                            <button
-                                                className="btn btn-danger"
-                                                onClick={() => void onDelete(g.id)}
-                                                disabled={busy}
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                            <div className="empty-state">{busy ? "Loading…" : "No gestures configured. Click an arrow around the ball to assign one."}</div>
                         )}
                     </section>
 
@@ -462,8 +399,6 @@ function normalizeImportedSettings(input: unknown): Settings {
 }
 
 const NUM_GESTURE_KEYS = 3;
-const GRID_DIRECTIONS = [Direction.UP, Direction.RIGHT, Direction.DOWN, Direction.LEFT] as const;
-
 function blankGesture(setId = 0, dir: Direction = Direction.UP): Gesture {
     return {
         id: 0,
@@ -483,135 +418,141 @@ function findGestureInCell(gestures: Gesture[], setId: number, dir: Direction): 
     ) ?? null;
 }
 
-function isGridGesture(g: Gesture): boolean {
-    return g.setId >= 0 &&
-        g.setId < NUM_GESTURE_KEYS &&
-        g.pattern.directions.length === 1 &&
-        GRID_DIRECTIONS.includes(g.pattern.directions[0] as typeof GRID_DIRECTIONS[number]);
-}
 
 // === Subcomponents =====================================================
 
-function TrackballGestureIllustration() {
+function TrackballGestureIllustration({
+    gestures,
+    activeSetId,
+    onActiveSetChange,
+    busy,
+    onDirectionClick,
+}: {
+    gestures: Gesture[];
+    activeSetId: number;
+    onActiveSetChange: (setId: number) => void;
+    busy: boolean;
+    onDirectionClick: (setId: number, dir: Direction) => void;
+}) {
     return (
         <div className="trackball-gesture-hero" aria-label="Trackball gesture directions">
             <div className="trackball-copy">
                 <div className="trackball-title">Gesture button + ball movement</div>
                 <div className="trackball-subtitle">
-                    Hold <code>Mouse Gesture Key 0/1/2</code>, then roll the ball toward one direction.
+                    Select <code>Mouse Gesture Key {activeSetId}</code>, then click a direction around the ball to assign or edit it.
+                </div>
+                <div className="gesture-key-tabs" role="tablist" aria-label="Gesture key">
+                    {Array.from({ length: NUM_GESTURE_KEYS }, (_, setId) => (
+                        <button
+                            key={setId}
+                            type="button"
+                            className={`gesture-key-tab ${setId === activeSetId ? "active" : ""}`}
+                            onClick={() => onActiveSetChange(setId)}
+                            disabled={busy}
+                        >
+                            Key {setId}
+                            <code>&amp;mg_set {setId}</code>
+                        </button>
+                    ))}
                 </div>
             </div>
             <div className="trackball-art-wrap">
-                <div className="gesture-label gesture-label-up">↑ Up</div>
-                <div className="gesture-label gesture-label-right">Right →</div>
-                <div className="gesture-label gesture-label-down">↓ Down</div>
-                <div className="gesture-label gesture-label-left">← Left</div>
-                <svg className="trackball-art" viewBox="0 0 220 180" role="img" aria-label="Trackball illustration">
+                <TrackballDirectionButton
+                    className="gesture-direction-up"
+                    dir={Direction.UP}
+                    setId={activeSetId}
+                    gesture={findGestureInCell(gestures, activeSetId, Direction.UP)}
+                    busy={busy}
+                    onClick={onDirectionClick}
+                />
+                <TrackballDirectionButton
+                    className="gesture-direction-right"
+                    dir={Direction.RIGHT}
+                    setId={activeSetId}
+                    gesture={findGestureInCell(gestures, activeSetId, Direction.RIGHT)}
+                    busy={busy}
+                    onClick={onDirectionClick}
+                />
+                <TrackballDirectionButton
+                    className="gesture-direction-down"
+                    dir={Direction.DOWN}
+                    setId={activeSetId}
+                    gesture={findGestureInCell(gestures, activeSetId, Direction.DOWN)}
+                    busy={busy}
+                    onClick={onDirectionClick}
+                />
+                <TrackballDirectionButton
+                    className="gesture-direction-left"
+                    dir={Direction.LEFT}
+                    setId={activeSetId}
+                    gesture={findGestureInCell(gestures, activeSetId, Direction.LEFT)}
+                    busy={busy}
+                    onClick={onDirectionClick}
+                />
+                <svg className="trackball-art trackball-ball-only" viewBox="0 0 180 180" role="img" aria-label="Trackball ball">
                     <defs>
-                        <radialGradient id="ballGradient" cx="42%" cy="32%" r="68%">
-                            <stop offset="0%" stopColor="#8b9497" />
-                            <stop offset="62%" stopColor="#555b5e" />
-                            <stop offset="100%" stopColor="#363b3e" />
+                        <radialGradient id="ballGradient" cx="36%" cy="30%" r="72%">
+                            <stop offset="0%" stopColor="#b9c2c7" />
+                            <stop offset="42%" stopColor="#6d7478" />
+                            <stop offset="100%" stopColor="#2c3135" />
                         </radialGradient>
-                        <linearGradient id="bodyGradient" x1="0" x2="1" y1="0" y2="1">
-                            <stop offset="0%" stopColor="#4b5053" />
-                            <stop offset="100%" stopColor="#2a2e31" />
-                        </linearGradient>
                     </defs>
-                    <path
-                        className="trackball-shadow"
-                        d="M72 154 C88 170 134 172 153 154 C169 139 156 118 159 91 C162 57 143 31 114 26 C86 22 63 42 59 72 C56 92 43 104 45 126 C46 139 57 148 72 154 Z"
-                    />
-                    <path
-                        className="trackball-body"
-                        d="M70 146 C86 163 132 166 151 148 C166 134 153 115 157 89 C161 58 142 34 115 29 C88 25 66 44 62 72 C59 91 46 101 48 123 C49 136 57 142 70 146 Z"
-                    />
-                    <circle className="trackball-ball" cx="111" cy="78" r="30" />
-                    <circle className="trackball-highlight" cx="101" cy="67" r="8" />
-                    <circle className="trackball-button" cx="112" cy="78" r="6" />
-                    <path className="trackball-seam" d="M82 104 C96 114 122 117 143 104" />
-                    <g className="trackball-arrows">
-                        <path d="M110 7 L110 35" />
-                        <path d="M110 7 L101 17" />
-                        <path d="M110 7 L119 17" />
-                        <path d="M110 173 L110 145" />
-                        <path d="M110 173 L101 163" />
-                        <path d="M110 173 L119 163" />
-                        <path d="M14 90 L42 90" />
-                        <path d="M14 90 L24 81" />
-                        <path d="M14 90 L24 99" />
-                        <path d="M206 90 L178 90" />
-                        <path d="M206 90 L196 81" />
-                        <path d="M206 90 L196 99" />
-                    </g>
+                    <circle className="trackball-ball-shadow" cx="94" cy="96" r="62" />
+                    <circle className="trackball-ball" cx="90" cy="88" r="62" />
+                    <circle className="trackball-highlight" cx="68" cy="62" r="14" />
+                    <circle className="trackball-button" cx="90" cy="88" r="11" />
                 </svg>
             </div>
         </div>
     );
 }
 
-function GestureGrid({
-    gestures,
+function TrackballDirectionButton({
+    className,
+    dir,
+    setId,
+    gesture,
     busy,
-    onCellClick,
+    onClick,
 }: {
-    gestures: Gesture[];
+    className: string;
+    dir: Direction;
+    setId: number;
+    gesture: Gesture | null;
     busy: boolean;
-    onCellClick: (setId: number, dir: Direction) => void;
+    onClick: (setId: number, dir: Direction) => void;
 }) {
     return (
-        <div className="gesture-grid-wrap">
-            <table className="gesture-grid-table">
-                <thead>
-                    <tr>
-                        <th>Gesture key</th>
-                        {GRID_DIRECTIONS.map((d) => (
-                            <th key={d}>{patternToArrows([d])}</th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {Array.from({ length: NUM_GESTURE_KEYS }, (_, setId) => (
-                        <tr key={setId}>
-                            <th>
-                                <div className="set-label">Key {setId}</div>
-                                <code>&amp;mg_set {setId}</code>
-                            </th>
-                            {GRID_DIRECTIONS.map((dir) => {
-                                const g = findGestureInCell(gestures, setId, dir);
-                                return (
-                                    <td key={dir}>
-                                        <button
-                                            type="button"
-                                            className={`gesture-cell ${g ? "configured" : "empty"}`}
-                                            onClick={() => onCellClick(setId, dir)}
-                                            disabled={busy}
-                                        >
-                                            {g ? (
-                                                <>
-                                                    <span className="cell-name">{g.name || `#${g.id}`}</span>
-                                                    <span className="cell-binding">
-                                                        <BindingLabel
-                                                            behavior={g.binding.behavior}
-                                                            param1={g.binding.param1}
-                                                            param2={g.binding.param2}
-                                                        />
-                                                    </span>
-                                                    {!g.enabled && <span className="cell-disabled">disabled</span>}
-                                                </>
-                                            ) : (
-                                                <span className="cell-empty">+ assign</span>
-                                            )}
-                                        </button>
-                                    </td>
-                                );
-                            })}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
+        <button
+            type="button"
+            className={`trackball-direction ${className} ${gesture ? "configured" : "empty"}`}
+            onClick={() => onClick(setId, dir)}
+            disabled={busy}
+            aria-label={`${patternToArrows([dir])} gesture for key ${setId}`}
+        >
+            <span className="direction-arrow">{patternToArrows([dir])}</span>
+            <span className="direction-name">{directionName(dir)}</span>
+            <span className="direction-binding">
+                {gesture ? (
+                    <BindingLabel
+                        behavior={gesture.binding.behavior}
+                        param1={gesture.binding.param1}
+                        param2={gesture.binding.param2}
+                    />
+                ) : "+ assign"}
+            </span>
+        </button>
     );
+}
+
+function directionName(dir: Direction): string {
+    switch (dir) {
+        case Direction.UP: return "Up";
+        case Direction.RIGHT: return "Right";
+        case Direction.DOWN: return "Down";
+        case Direction.LEFT: return "Left";
+        default: return "Direction";
+    }
 }
 
 function ConnectionPill({
