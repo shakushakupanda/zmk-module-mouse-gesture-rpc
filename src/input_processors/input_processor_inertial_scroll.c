@@ -60,6 +60,10 @@ static uint16_t code_for_index(size_t idx) {
     return idx == 0 ? INPUT_REL_WHEEL : INPUT_REL_HWHEEL;
 }
 
+static int32_t i32_abs(int32_t v) {
+    return v < 0 ? -v : v;
+}
+
 static void inertial_scroll_work_cb(struct k_work *work) {
     struct k_work_delayable *dwork = k_work_delayable_from_work(work);
     struct inertial_scroll_data *data = CONTAINER_OF(dwork, struct inertial_scroll_data, work);
@@ -80,7 +84,7 @@ static void inertial_scroll_work_cb(struct k_work *work) {
 
     for (size_t i = 0; i < 2; i++) {
         int32_t v = data->velocity[i];
-        if (ABS(v) < st.min_velocity_q8 || data->ticks > st.max_ticks) {
+        if (i32_abs(v) < st.min_velocity_q8 || data->ticks > st.max_ticks) {
             data->velocity[i] = 0;
             continue;
         }
@@ -97,7 +101,7 @@ static void inertial_scroll_work_cb(struct k_work *work) {
         }
 
         data->velocity[i] = (v * st.decay_percent) / 100;
-        if (ABS(data->velocity[i]) >= st.min_velocity_q8) {
+        if (i32_abs(data->velocity[i]) >= st.min_velocity_q8) {
             keep_running = true;
         }
     }
