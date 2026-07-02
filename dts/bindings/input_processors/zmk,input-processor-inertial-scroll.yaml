@@ -5,10 +5,9 @@ description: Input processor that adds decaying inertial scroll after wheel move
 
 compatible: "zmk,input-processor-inertial-scroll"
 
+input-processor-cells: []
 
 properties:
-  "#input-processor-cells":
-    const: 0
   track-remainders:
     type: boolean
   enabled:
