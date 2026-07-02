@@ -43,6 +43,8 @@ struct inertial_scroll_data {
     bool injecting;
 };
 
+static struct inertial_scroll_data *g_inertial_scroll_data;
+
 static int code_index(uint16_t code) {
     switch (code) {
     case INPUT_REL_WHEEL:
@@ -61,7 +63,6 @@ static uint16_t code_for_index(size_t idx) {
 static void inertial_scroll_work_cb(struct k_work *work) {
     struct k_work_delayable *dwork = k_work_delayable_from_work(work);
     struct inertial_scroll_data *data = CONTAINER_OF(dwork, struct inertial_scroll_data, work);
-    const struct device *dev = data->dev;
     struct zmk_inertial_scroll_settings st = data->settings;
     uint16_t tick_ms = st.tick_ms == 0 ? 20 : st.tick_ms;
 
@@ -144,6 +145,9 @@ static int inertial_scroll_handle_event(const struct device *dev, struct input_e
 static int inertial_scroll_init(const struct device *dev) {
     struct inertial_scroll_data *data = dev->data;
     data->dev = dev;
+    if (!g_inertial_scroll_data) {
+        g_inertial_scroll_data = data;
+    }
     data->settings = (struct zmk_inertial_scroll_settings){
         .enabled = true,
         .tick_ms = 20,
@@ -170,43 +174,30 @@ static const struct zmk_input_processor_driver_api inertial_scroll_driver_api = 
 DT_INST_FOREACH_STATUS_OKAY(INERTIAL_SCROLL_INST)
 
 int zmk_inertial_scroll_runtime_get(struct zmk_inertial_scroll_settings *out) {
-#if DT_HAS_COMPAT_STATUS_OKAY(DT_DRV_COMPAT)
     if (!out) {
         return -EINVAL;
     }
-    const struct device *dev = DEVICE_DT_GET(DT_DRV_INST(0));
-    if (!device_is_ready(dev)) {
+    if (!g_inertial_scroll_data) {
         return -ENODEV;
     }
-    struct inertial_scroll_data *data = dev->data;
-    *out = data->settings;
+    *out = g_inertial_scroll_data->settings;
     return 0;
-#else
-    return -ENODEV;
-#endif
 }
 
 int zmk_inertial_scroll_runtime_set(const struct zmk_inertial_scroll_settings *settings) {
-#if DT_HAS_COMPAT_STATUS_OKAY(DT_DRV_COMPAT)
     if (!settings) {
         return -EINVAL;
     }
-#define APPLY_INERTIAL_SETTINGS(n) do {                                                           \
-        const struct device *dev = DEVICE_DT_GET(DT_DRV_INST(n));                                  \
-        if (device_is_ready(dev)) {                                                                \
-            struct inertial_scroll_data *data = dev->data;                                         \
-            data->settings = *settings;                                                           \
-            if (!data->settings.enabled) {                                                        \
-                data->velocity[0] = 0;                                                            \
-                data->velocity[1] = 0;                                                            \
-                k_work_cancel_delayable(&data->work);                                             \
-            }                                                                                     \
-        }                                                                                         \
-    } while (0);
-    DT_INST_FOREACH_STATUS_OKAY(APPLY_INERTIAL_SETTINGS)
-#undef APPLY_INERTIAL_SETTINGS
+    if (!g_inertial_scroll_data) {
+        return -ENODEV;
+    }
+
+    struct inertial_scroll_data *data = g_inertial_scroll_data;
+    data->settings = *settings;
+    if (!data->settings.enabled) {
+        data->velocity[0] = 0;
+        data->velocity[1] = 0;
+        k_work_cancel_delayable(&data->work);
+    }
     return 0;
-#else
-    return -ENODEV;
-#endif
 }
