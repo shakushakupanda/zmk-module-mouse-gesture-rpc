@@ -34,12 +34,6 @@ struct zmk_inertial_scroll_settings {
     uint8_t max_ticks;
 };
 
-struct inertial_scroll_config {
-    size_t codes_len;
-    const uint16_t *codes;
-    struct zmk_inertial_scroll_settings defaults;
-};
-
 struct inertial_scroll_data {
     struct k_work_delayable work;
     const struct device *dev;
@@ -49,20 +43,25 @@ struct inertial_scroll_data {
     bool injecting;
 };
 
-static int code_index(const struct inertial_scroll_config *cfg, uint16_t code) {
-    for (size_t i = 0; i < cfg->codes_len && i < 2; i++) {
-        if (cfg->codes[i] == code) {
-            return (int)i;
-        }
+static int code_index(uint16_t code) {
+    switch (code) {
+    case INPUT_REL_WHEEL:
+        return 0;
+    case INPUT_REL_HWHEEL:
+        return 1;
+    default:
+        return -1;
     }
-    return -1;
+}
+
+static uint16_t code_for_index(size_t idx) {
+    return idx == 0 ? INPUT_REL_WHEEL : INPUT_REL_HWHEEL;
 }
 
 static void inertial_scroll_work_cb(struct k_work *work) {
     struct k_work_delayable *dwork = k_work_delayable_from_work(work);
     struct inertial_scroll_data *data = CONTAINER_OF(dwork, struct inertial_scroll_data, work);
     const struct device *dev = data->dev;
-    const struct inertial_scroll_config *cfg = dev->config;
     struct zmk_inertial_scroll_settings st = data->settings;
     uint16_t tick_ms = st.tick_ms == 0 ? 20 : st.tick_ms;
 
@@ -78,7 +77,7 @@ static void inertial_scroll_work_cb(struct k_work *work) {
     data->ticks++;
     data->injecting = true;
 
-    for (size_t i = 0; i < cfg->codes_len && i < 2; i++) {
+    for (size_t i = 0; i < 2; i++) {
         int32_t v = data->velocity[i];
         if (ABS(v) < st.min_velocity_q8 || data->ticks > st.max_ticks) {
             data->velocity[i] = 0;
@@ -90,9 +89,9 @@ static void inertial_scroll_work_cb(struct k_work *work) {
             out = v > 0 ? 1 : -1;
         }
 
-        if (cfg->codes[i] == INPUT_REL_WHEEL) {
+        if (code_for_index(i) == INPUT_REL_WHEEL) {
             scroll_y += out;
-        } else if (cfg->codes[i] == INPUT_REL_HWHEEL) {
+        } else {
             scroll_x += out;
         }
 
@@ -122,14 +121,13 @@ static int inertial_scroll_handle_event(const struct device *dev, struct input_e
     ARG_UNUSED(param2);
     ARG_UNUSED(state);
 
-    const struct inertial_scroll_config *cfg = dev->config;
     struct inertial_scroll_data *data = dev->data;
 
     if (event->type != INPUT_EV_REL || data->injecting) {
         return ZMK_INPUT_PROC_CONTINUE;
     }
 
-    int idx = code_index(cfg, event->code);
+    int idx = code_index(event->code);
     if (idx < 0 || event->value == 0 || !data->settings.enabled) {
         return ZMK_INPUT_PROC_CONTINUE;
     }
@@ -145,9 +143,16 @@ static int inertial_scroll_handle_event(const struct device *dev, struct input_e
 
 static int inertial_scroll_init(const struct device *dev) {
     struct inertial_scroll_data *data = dev->data;
-    const struct inertial_scroll_config *cfg = dev->config;
     data->dev = dev;
-    data->settings = cfg->defaults;
+    data->settings = (struct zmk_inertial_scroll_settings){
+        .enabled = true,
+        .tick_ms = 20,
+        .idle_ms = 28,
+        .decay_percent = 86,
+        .impulse_percent = 180,
+        .min_velocity_q8 = 96,
+        .max_ticks = 36,
+    };
     k_work_init_delayable(&data->work, inertial_scroll_work_cb);
     return 0;
 }
@@ -158,23 +163,9 @@ static const struct zmk_input_processor_driver_api inertial_scroll_driver_api = 
 
 #define INERTIAL_SCROLL_INST(n)                                                                    \
     static struct inertial_scroll_data inertial_scroll_data_##n = {};                              \
-    static const uint16_t inertial_scroll_codes_##n[] = DT_INST_PROP(n, codes);                    \
-    static const struct inertial_scroll_config inertial_scroll_config_##n = {                      \
-        .codes_len = ARRAY_SIZE(inertial_scroll_codes_##n),                                        \
-        .codes = inertial_scroll_codes_##n,                                                        \
-        .defaults = {                                                                              \
-            .enabled = DT_INST_PROP(n, enabled),                                                   \
-            .tick_ms = DT_INST_PROP_OR(n, tick_ms, 20),                                            \
-            .idle_ms = DT_INST_PROP_OR(n, idle_ms, 24),                                            \
-            .decay_percent = DT_INST_PROP_OR(n, decay_percent, 86),                                \
-            .impulse_percent = DT_INST_PROP_OR(n, impulse_percent, 180),                           \
-            .min_velocity_q8 = DT_INST_PROP_OR(n, min_velocity_q8, 96),                            \
-            .max_ticks = DT_INST_PROP_OR(n, max_ticks, 36),                                        \
-        },                                                                                         \
-    };                                                                                             \
-    DEVICE_DT_INST_DEFINE(n, inertial_scroll_init, NULL, &inertial_scroll_data_##n,                \
-                          &inertial_scroll_config_##n, POST_KERNEL,                               \
-                          CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &inertial_scroll_driver_api);
+    DEVICE_DT_INST_DEFINE(n, inertial_scroll_init, NULL, &inertial_scroll_data_##n, NULL,          \
+                          POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT,                       \
+                          &inertial_scroll_driver_api);
 
 DT_INST_FOREACH_STATUS_OKAY(INERTIAL_SCROLL_INST)
 
