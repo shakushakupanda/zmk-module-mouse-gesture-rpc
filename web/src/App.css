@@ -550,3 +550,93 @@
     color: var(--color-text);
     font-weight: 600;
 }
+
+/* Trackball gesture illustration */
+.trackball-gesture-hero {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(260px, 420px);
+    gap: 18px;
+    align-items: center;
+    margin: 14px 0 16px;
+    padding: 16px 18px;
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    background:
+        radial-gradient(circle at 74% 50%, rgba(0, 211, 194, 0.12), transparent 30%),
+        linear-gradient(135deg, var(--color-bg-soft), var(--color-bg-elev));
+}
+.trackball-title {
+    font-size: 1rem;
+    font-weight: 650;
+    color: var(--color-text);
+    margin-bottom: 6px;
+}
+.trackball-subtitle {
+    color: var(--color-text-muted);
+    font-size: 0.86rem;
+    line-height: 1.55;
+}
+.trackball-art-wrap {
+    position: relative;
+    min-height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.trackball-art {
+    width: min(100%, 310px);
+    height: auto;
+    overflow: visible;
+}
+.trackball-shadow {
+    fill: rgba(0, 0, 0, 0.28);
+    transform: translate(4px, 7px);
+}
+.trackball-body {
+    fill: url(#bodyGradient);
+    stroke: rgba(255, 255, 255, 0.08);
+    stroke-width: 1.2;
+}
+.trackball-ball {
+    fill: url(#ballGradient);
+    stroke: rgba(255, 255, 255, 0.12);
+    stroke-width: 1;
+}
+.trackball-highlight {
+    fill: rgba(255, 255, 255, 0.18);
+}
+.trackball-button {
+    fill: none;
+    stroke: var(--color-blue);
+    stroke-width: 3;
+}
+.trackball-seam {
+    fill: none;
+    stroke: rgba(0, 0, 0, 0.28);
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+.trackball-arrows path {
+    fill: none;
+    stroke: var(--color-text);
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.92;
+}
+.gesture-label {
+    position: absolute;
+    color: var(--color-blue);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.25);
+}
+.gesture-label-up { top: 4px; left: 50%; transform: translateX(-50%); }
+.gesture-label-right { right: 8px; top: 50%; transform: translateY(-50%); }
+.gesture-label-down { bottom: 2px; left: 50%; transform: translateX(-50%); }
+.gesture-label-left { left: 8px; top: 50%; transform: translateY(-50%); }
+@media (max-width: 760px) {
+    .trackball-gesture-hero { grid-template-columns: 1fr; }
+    .trackball-art-wrap { min-height: 190px; }
+}

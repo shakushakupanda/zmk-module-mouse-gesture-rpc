@@ -305,6 +305,7 @@ function App() {
                         <p className="muted" style={{ marginTop: 0 }}>
                             Each row is a gesture key ID (<code>&amp;mg_set N</code>). Each column is the direction stroked while holding that gesture key.
                         </p>
+                        <TrackballGestureIllustration />
                         <GestureGrid
                             gestures={data.gestures}
                             busy={busy}
@@ -490,6 +491,64 @@ function isGridGesture(g: Gesture): boolean {
 }
 
 // === Subcomponents =====================================================
+
+function TrackballGestureIllustration() {
+    return (
+        <div className="trackball-gesture-hero" aria-label="Trackball gesture directions">
+            <div className="trackball-copy">
+                <div className="trackball-title">Gesture button + ball movement</div>
+                <div className="trackball-subtitle">
+                    Hold <code>Mouse Gesture Key 0/1/2</code>, then roll the ball toward one direction.
+                </div>
+            </div>
+            <div className="trackball-art-wrap">
+                <div className="gesture-label gesture-label-up">↑ Up</div>
+                <div className="gesture-label gesture-label-right">Right →</div>
+                <div className="gesture-label gesture-label-down">↓ Down</div>
+                <div className="gesture-label gesture-label-left">← Left</div>
+                <svg className="trackball-art" viewBox="0 0 220 180" role="img" aria-label="Trackball illustration">
+                    <defs>
+                        <radialGradient id="ballGradient" cx="42%" cy="32%" r="68%">
+                            <stop offset="0%" stopColor="#8b9497" />
+                            <stop offset="62%" stopColor="#555b5e" />
+                            <stop offset="100%" stopColor="#363b3e" />
+                        </radialGradient>
+                        <linearGradient id="bodyGradient" x1="0" x2="1" y1="0" y2="1">
+                            <stop offset="0%" stopColor="#4b5053" />
+                            <stop offset="100%" stopColor="#2a2e31" />
+                        </linearGradient>
+                    </defs>
+                    <path
+                        className="trackball-shadow"
+                        d="M72 154 C88 170 134 172 153 154 C169 139 156 118 159 91 C162 57 143 31 114 26 C86 22 63 42 59 72 C56 92 43 104 45 126 C46 139 57 148 72 154 Z"
+                    />
+                    <path
+                        className="trackball-body"
+                        d="M70 146 C86 163 132 166 151 148 C166 134 153 115 157 89 C161 58 142 34 115 29 C88 25 66 44 62 72 C59 91 46 101 48 123 C49 136 57 142 70 146 Z"
+                    />
+                    <circle className="trackball-ball" cx="111" cy="78" r="30" />
+                    <circle className="trackball-highlight" cx="101" cy="67" r="8" />
+                    <circle className="trackball-button" cx="112" cy="78" r="6" />
+                    <path className="trackball-seam" d="M82 104 C96 114 122 117 143 104" />
+                    <g className="trackball-arrows">
+                        <path d="M110 7 L110 35" />
+                        <path d="M110 7 L101 17" />
+                        <path d="M110 7 L119 17" />
+                        <path d="M110 173 L110 145" />
+                        <path d="M110 173 L101 163" />
+                        <path d="M110 173 L119 163" />
+                        <path d="M14 90 L42 90" />
+                        <path d="M14 90 L24 81" />
+                        <path d="M14 90 L24 99" />
+                        <path d="M206 90 L178 90" />
+                        <path d="M206 90 L196 81" />
+                        <path d="M206 90 L196 99" />
+                    </g>
+                </svg>
+            </div>
+        </div>
+    );
+}
 
 function GestureGrid({
     gestures,
