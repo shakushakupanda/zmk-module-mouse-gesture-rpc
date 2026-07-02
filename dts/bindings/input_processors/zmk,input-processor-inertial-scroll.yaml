@@ -5,11 +5,9 @@ description: Input processor that adds decaying inertial scroll after wheel move
 
 compatible: "zmk,input-processor-inertial-scroll"
 
-input-processor-cells: []
+include: ip_zero_param.yaml
 
 properties:
-  track-remainders:
-    type: boolean
   enabled:
     type: boolean
     description: Enable inertial scroll by default.
