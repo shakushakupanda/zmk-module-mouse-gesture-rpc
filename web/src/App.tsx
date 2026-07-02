@@ -6,7 +6,7 @@
  * speaks the same ZMK Studio protocol as DYA Studio / mg_cli.py.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import "./App.css";
 import { MouseGestureClient } from "./lib/mouseGestureClient";
 import {
