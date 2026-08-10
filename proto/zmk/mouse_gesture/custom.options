@@ -1,3 +1,5 @@
+
+zmk.mouse_gesture.GetLogResponse.entries        max_count:32
 # Nanopb options for custom.proto
 # Embedded firmware avoids dynamic allocation, so all string and repeated
 # fields must have a static maximum size declared here.

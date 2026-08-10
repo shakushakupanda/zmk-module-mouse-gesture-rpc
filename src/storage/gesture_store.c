@@ -1,18 +1,19 @@
 /*
- * Runtime gesture store — Phase 3 implementation.
+ * Runtime gesture store -- Phase 3 + Phase 5 sync_to_kot149 + Option C
+ * breadcrumb logging + Approach D multi-set.
  *
- * Layout:
- *   - mg_store_init() loads from Zephyr settings (key prefix "cmg/").
- *     If no saved data, seeds from DTS defaults (extracted via the same
- *     DT macros that the firmware's compile-time trie uses, so the seed
- *     matches what kot149 actually matches today).
- *   - Mutations call save() which writes the whole array as one blob.
- *     Simpler than per-slot keys; the blob is at most ~6KB.
+ * Each gesture has a `set_id` (0..MG_NUM_SETS-1). At any time, exactly
+ * one set is "active". sync_to_kot149() pushes only the active set's
+ * gestures to kot149's trie. The `&mg_set N` behavior calls
+ * mg_store_activate_set(N) on press, which atomically switches the
+ * active set and re-syncs.
  */
 
 #include "gesture_store.h"
+#include "log_ring.h"
 
 #include <errno.h>
+#include <stdint.h>
 #include <string.h>
 
 #include <zephyr/devicetree.h>
@@ -26,6 +27,10 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
+#ifndef __weak
+#define __weak __attribute__((weak))
+#endif
+
 /* === Runtime array =================================================== */
 
 static struct mg_gesture g_store[MG_MAX_GESTURES];
@@ -33,7 +38,11 @@ static size_t            g_count;
 static uint32_t          g_next_id = 1;
 static bool              g_loaded;
 
-/* Settings (Phase 4). Defaults match kot149/zmk-mouse-gesture library defaults. */
+/* Active set: which set_id is currently pushed to kot149's trie.
+ * Modified by mg_store_activate_set(), default 0 at boot. */
+static uint32_t g_active_set = 0;
+
+/* Settings. Defaults match kot149/zmk-mouse-gesture library defaults. */
 static struct mg_settings g_settings = {
     .stroke_size         = 200,
     .idle_timeout_ms     = 150,
@@ -41,9 +50,48 @@ static struct mg_settings g_settings = {
     .movement_threshold  = 0,
     .enable_eager_mode   = false,
     .always_active       = false,
+
+    .inertial_scroll_enabled         = false,
+    .inertial_scroll_tick_ms         = 20,
+    .inertial_scroll_idle_ms         = 28,
+    .inertial_scroll_decay_percent   = 86,
+    .inertial_scroll_impulse_percent = 180,
+    .inertial_scroll_min_velocity_q8 = 96,
+    .inertial_scroll_max_ticks       = 36,
 };
 
-/* === Phase 5: kot149 trie sync storage =================================
+struct zmk_inertial_scroll_settings {
+    bool enabled;
+    uint16_t tick_ms;
+    uint16_t idle_ms;
+    uint8_t decay_percent;
+    uint16_t impulse_percent;
+    uint16_t min_velocity_q8;
+    uint8_t max_ticks;
+};
+
+__weak int zmk_inertial_scroll_runtime_set(const struct zmk_inertial_scroll_settings *settings) {
+    ARG_UNUSED(settings);
+    return -ENOTSUP;
+}
+
+static void apply_inertial_scroll_settings(void) {
+    struct zmk_inertial_scroll_settings s = {
+        .enabled = g_settings.inertial_scroll_enabled,
+        .tick_ms = CLAMP(g_settings.inertial_scroll_tick_ms, 1, UINT16_MAX),
+        .idle_ms = CLAMP(g_settings.inertial_scroll_idle_ms, 0, UINT16_MAX),
+        .decay_percent = CLAMP(g_settings.inertial_scroll_decay_percent, 1, 99),
+        .impulse_percent = CLAMP(g_settings.inertial_scroll_impulse_percent, 0, UINT16_MAX),
+        .min_velocity_q8 = CLAMP(g_settings.inertial_scroll_min_velocity_q8, 1, UINT16_MAX),
+        .max_ticks = CLAMP(g_settings.inertial_scroll_max_ticks, 0, UINT8_MAX),
+    };
+    int rc = zmk_inertial_scroll_runtime_set(&s);
+    if (rc && rc != -ENOTSUP && rc != -ENODEV) {
+        LOG_WRN("mg_store: inertial scroll apply failed: %d", rc);
+    }
+}
+
+/* === kot149 trie sync storage =========================================
  * These arrays back the runtime gesture set we push to kot149's input
  * processor. The driver retains pointers into them via its trie nodes,
  * so they must outlive the trie (static storage = program lifetime).
@@ -64,11 +112,14 @@ static uint8_t proto_to_kot_direction(uint8_t d) {
     }
 }
 
+/* Push ONLY g_active_set's gestures to kot149's trie. */
 static int sync_to_kot149(void) {
+    mg_log_push(MG_LOG_SYNC_ENTER, g_active_set, 0);
     size_t n = 0;
     for (size_t i = 0; i < MG_MAX_GESTURES && n < MG_MAX_GESTURES; i++) {
         if (!g_store[i].in_use || !g_store[i].enabled) continue;
         if (g_store[i].pattern_len == 0) continue;
+        if (g_store[i].set_id != g_active_set) continue;   /* multi-set filter */
 
         size_t plen = g_store[i].pattern_len;
         if (plen > MG_PATTERN_MAX) plen = MG_PATTERN_MAX;
@@ -90,13 +141,39 @@ static int sync_to_kot149(void) {
         };
         n++;
     }
+    mg_log_push(MG_LOG_SYNC_PATTERNS_BUILT, (uint32_t)n, g_active_set);
+    mg_log_push(MG_LOG_SYNC_RUNTIME_SET_PRE, (uint32_t)n, 0);
     int rc = zmk_mouse_gesture_runtime_set(g_kot_patterns, n);
+    mg_log_push(MG_LOG_SYNC_RUNTIME_SET_POST, (uint32_t)n, (uint32_t)rc);
     if (rc) {
-        LOG_WRN("mg_store: sync_to_kot149 failed: %d (n=%u)", rc, (unsigned)n);
+        LOG_WRN("mg_store: sync_to_kot149 failed: %d (set=%u, n=%u)",
+                rc, (unsigned)g_active_set, (unsigned)n);
     } else {
-        LOG_INF("mg_store: synced %u gestures to kot149 trie", (unsigned)n);
+        LOG_INF("mg_store: synced %u gestures from set %u to kot149 trie",
+                (unsigned)n, (unsigned)g_active_set);
     }
+    mg_log_push(MG_LOG_SYNC_RETURN, (uint32_t)n, (uint32_t)rc);
     return rc;
+}
+
+/*
+ * Runtime trie rebuild can be surprisingly expensive and may contend with
+ * the input processor state while Studio RPC is waiting for a response.
+ * Keep RPC add/update/delete responsive: persist synchronously, then rebuild
+ * kot149's runtime trie from system work.  Activation via &mg_set still calls
+ * sync_to_kot149() directly because it must take effect before the next
+ * trackball movement.
+ */
+static void sync_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
+    (void)sync_to_kot149();
+}
+
+static K_WORK_DELAYABLE_DEFINE(g_sync_work, sync_work_handler);
+
+static void schedule_runtime_sync(void) {
+    mg_log_push(MG_LOG_SYNC_RUNTIME_SET_PRE, g_active_set, 0);
+    (void)k_work_reschedule(&g_sync_work, K_NO_WAIT);
 }
 
 /* === DTS defaults extraction (mirrors handler.c phase-2 walk) ======= */
@@ -120,7 +197,6 @@ static inline uint8_t kot_to_proto_direction(uint8_t d) {
     }
 }
 
-/* Always-visible struct so the #else branch compiles too. */
 struct mg_dts_default {
     const char    *name;
     const uint8_t *pattern;
@@ -184,6 +260,7 @@ static void seed_from_dts(void) {
         g->in_use  = true;
         g->enabled = true;
         g->id      = g_next_id++;
+        g->set_id  = 0;  /* DTS defaults seed set 0 */
         if (d->name) strncpy(g->name, d->name, sizeof(g->name) - 1);
         if (d->binding_behavior) {
             strncpy(g->binding_behavior, d->binding_behavior,
@@ -205,7 +282,6 @@ static void seed_from_dts(void) {
 /* Persist the whole store to settings. */
 static int store_save(void) {
     int rc;
-    /* The blob: [count:4][next_id:4][gestures...] */
     uint32_t hdr[2] = {(uint32_t)g_count, g_next_id};
     rc = settings_save_one("cmg/hdr", hdr, sizeof(hdr));
     if (rc) {
@@ -261,6 +337,9 @@ static int copy_into_slot(struct mg_gesture *slot,
     if (src->pattern_len == 0 || src->pattern_len > MG_PATTERN_MAX) {
         return -EINVAL;
     }
+    if (src->set_id >= MG_NUM_SETS) {
+        return -EINVAL;
+    }
     memset(slot, 0, sizeof(*slot));
     slot->in_use      = true;
     slot->enabled     = src->enabled;
@@ -269,6 +348,7 @@ static int copy_into_slot(struct mg_gesture *slot,
     memcpy(slot->pattern, src->pattern, src->pattern_len);
     slot->binding_param1 = src->binding_param1;
     slot->binding_param2 = src->binding_param2;
+    slot->set_id         = src->set_id;
     strncpy(slot->name, src->name, sizeof(slot->name) - 1);
     strncpy(slot->binding_behavior, src->binding_behavior,
             sizeof(slot->binding_behavior) - 1);
@@ -299,7 +379,6 @@ static void recount(void) {
     g_count = c;
 }
 
-/* Compact: move in_use entries to the front so iteration is contiguous. */
 static void compact(void) {
     size_t dst = 0;
     for (size_t src = 0; src < MG_MAX_GESTURES; src++) {
@@ -317,6 +396,8 @@ static void compact(void) {
 /* === Public API ====================================================== */
 
 int mg_store_init(void) {
+    mg_log_push(MG_LOG_BOOT_ENTER, 0, 0);
+
     int rc = settings_subsys_init();
     if (rc) {
         LOG_WRN("mg_store: settings_subsys_init failed: %d", rc);
@@ -324,22 +405,30 @@ int mg_store_init(void) {
 
     g_loaded = false;
     memset(g_store, 0, sizeof(g_store));
-    g_count   = 0;
-    g_next_id = 1;
+    g_count    = 0;
+    g_next_id  = 1;
+    g_active_set = 0;
 
     (void)settings_load_subtree("cmg");
+    apply_inertial_scroll_settings();
 
     if (!g_loaded || g_count == 0) {
         LOG_INF("mg_store: no saved data, seeding from DTS defaults (n=%u)",
                 (unsigned)NUM_DTS_DEFAULTS);
         seed_from_dts();
+        mg_log_push(MG_LOG_BOOT_SEEDED, (uint32_t)NUM_DTS_DEFAULTS, 0);
         store_save();
     } else {
         recount();
+        mg_log_push(MG_LOG_BOOT_LOADED, (uint32_t)g_count, 0);
         LOG_INF("mg_store: loaded %u gestures from NVS", (unsigned)g_count);
     }
-    /* Push the loaded/seeded store to kot149's runtime trie. */
+
+    mg_log_push(MG_LOG_BOOT_SYNC_PRE, (uint32_t)g_count, 0);
     sync_to_kot149();
+    mg_log_push(MG_LOG_BOOT_SYNC_POST, (uint32_t)g_count, 0);
+
+    mg_log_push(MG_LOG_BOOT_DONE, (uint32_t)g_count, 0);
     return 0;
 }
 
@@ -360,6 +449,7 @@ const struct mg_gesture *mg_store_find(uint32_t id) {
 }
 
 int mg_store_add(const struct mg_gesture *g, uint32_t *out_id) {
+    mg_log_push(MG_LOG_ADD_ENTER, g->pattern_len, g->binding_param1);
     int slot = find_free_slot_index();
     if (slot < 0) return -ENOSPC;
     uint32_t id = g_next_id++;
@@ -370,37 +460,78 @@ int mg_store_add(const struct mg_gesture *g, uint32_t *out_id) {
     }
     g_count++;
     if (out_id) *out_id = id;
+    mg_log_push(MG_LOG_ADD_COPIED, id, (uint32_t)slot);
     rc = store_save();
-    sync_to_kot149();
+    mg_log_push(MG_LOG_ADD_SAVED, id, (uint32_t)rc);
+    /* Re-sync only if this gesture belongs to the active set. */
+    if (g_store[slot].set_id == g_active_set) {
+        schedule_runtime_sync();
+    }
+    mg_log_push(MG_LOG_ADD_SYNCED, id, 0);
+    mg_log_push(MG_LOG_ADD_RETURN, id, (uint32_t)rc);
     return rc;
 }
 
 int mg_store_update(const struct mg_gesture *g) {
+    mg_log_push(MG_LOG_UPDATE_ENTER, g->id, 0);
     struct mg_gesture *slot = find_slot_by_id_mut(g->id);
     if (!slot) return -ENOENT;
+    uint32_t old_set = slot->set_id;
     uint32_t keep_id = slot->id;
     int rc = copy_into_slot(slot, g, keep_id);
     if (rc) return rc;
     rc = store_save();
-    sync_to_kot149();
+    mg_log_push(MG_LOG_UPDATE_SAVED, g->id, (uint32_t)rc);
+    /* Re-sync if either the old or new set matched active. */
+    if (old_set == g_active_set || slot->set_id == g_active_set) {
+        schedule_runtime_sync();
+    }
+    mg_log_push(MG_LOG_UPDATE_SYNCED, g->id, 0);
+    mg_log_push(MG_LOG_UPDATE_RETURN, g->id, (uint32_t)rc);
     return rc;
 }
 
 int mg_store_delete(uint32_t id) {
+    mg_log_push(MG_LOG_DELETE_ENTER, id, 0);
     struct mg_gesture *slot = find_slot_by_id_mut(id);
     if (!slot) return -ENOENT;
+    uint32_t deleted_set = slot->set_id;
     memset(slot, 0, sizeof(*slot));
     compact();
+    mg_log_push(MG_LOG_DELETE_COMPACTED, id, (uint32_t)g_count);
     int rc = store_save();
-    /* sync_to_kot149(); */
+    mg_log_push(MG_LOG_DELETE_SAVED, id, (uint32_t)rc);
+    if (deleted_set == g_active_set) {
+        schedule_runtime_sync();
+    }
+    mg_log_push(MG_LOG_DELETE_RETURN, id, (uint32_t)rc);
     return rc;
 }
 
 int mg_store_reset_to_defaults(void) {
+    mg_log_push(MG_LOG_RESET_ENTER, 0, 0);
     seed_from_dts();
+    mg_log_push(MG_LOG_RESET_SEEDED, (uint32_t)g_count, 0);
     int rc = store_save();
-    sync_to_kot149();
+    mg_log_push(MG_LOG_RESET_SAVED, (uint32_t)g_count, (uint32_t)rc);
+    g_active_set = 0;
+    schedule_runtime_sync();
+    mg_log_push(MG_LOG_RESET_SYNCED, (uint32_t)g_count, 0);
+    mg_log_push(MG_LOG_RESET_RETURN, (uint32_t)g_count, (uint32_t)rc);
     return rc;
+}
+
+/* === Multi-set (Approach D) =========================================== */
+
+int mg_store_activate_set(uint32_t set_id) {
+    if (set_id >= MG_NUM_SETS) return -EINVAL;
+    if (set_id == g_active_set) return 0;   /* no-op if already active */
+    g_active_set = set_id;
+    return sync_to_kot149();
+}
+
+uint32_t mg_store_active_set(void) {
+    return g_active_set;
 }
 
 /* === Settings (Phase 4) ============================================== */
@@ -415,6 +546,8 @@ int mg_settings_set(const struct mg_settings *s) {
     int rc = settings_save_one("cmg/settings", &g_settings, sizeof(g_settings));
     if (rc) {
         LOG_WRN("mg_store: save settings failed: %d", rc);
+    } else {
+        apply_inertial_scroll_settings();
     }
     return rc;
 }

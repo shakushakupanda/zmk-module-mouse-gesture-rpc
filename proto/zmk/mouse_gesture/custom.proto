@@ -37,6 +37,7 @@ message Gesture {
     GesturePattern pattern = 3;
     Binding binding = 4;
     bool enabled = 5;
+    uint32 set_id = 6;                // activation set (0..MG_NUM_SETS-1, default 0)
 }
 
 message Settings {
@@ -46,6 +47,22 @@ message Settings {
     uint32 movement_threshold = 4;     // ignore deltas below this (default 0)
     bool enable_eager_mode = 5;        // invoke on match without waiting for idle
     bool always_active = 6;            // skip activation-key gating
+
+    bool inertial_scroll_enabled = 7;
+    uint32 inertial_scroll_tick_ms = 8;
+    uint32 inertial_scroll_idle_ms = 9;
+    uint32 inertial_scroll_decay_percent = 10;
+    uint32 inertial_scroll_impulse_percent = 11;
+    uint32 inertial_scroll_min_velocity_q8 = 12;
+    uint32 inertial_scroll_max_ticks = 13;
+}
+
+// Phase 5 debug aid: each breadcrumb entry recorded by the firmware.
+message LogEntry {
+    uint32 ts_ms = 1;     // k_uptime_get() at push time
+    uint32 code  = 2;     // mg_log_code enum (see src/storage/log_ring.h)
+    uint32 arg1  = 3;
+    uint32 arg2  = 4;
 }
 
 // === Requests ===
@@ -59,6 +76,8 @@ message ResetToDefaultsRequest {}
 
 message GetSettingsRequest {}
 message SetSettingsRequest { Settings settings = 1; }
+
+message GetLogRequest {}
 
 // === Responses ===
 
@@ -74,6 +93,10 @@ message ErrorResponse {
     string message = 1;
 }
 
+message GetLogResponse {
+    repeated LogEntry entries = 1;  // max_count: 32 (see custom.options)
+}
+
 // === Top-level wrappers ===
 
 message Request {
@@ -86,6 +109,7 @@ message Request {
         ResetToDefaultsRequest reset_to_defaults = 6;
         GetSettingsRequest get_settings = 7;
         SetSettingsRequest set_settings = 8;
+        GetLogRequest get_log = 9;
     }
 }
 
@@ -96,6 +120,7 @@ message Response {
         GestureResponse gesture = 3;
         Empty empty = 4;
         GetSettingsResponse settings = 5;
+        GetLogResponse log = 6;
     }
 }
 

@@ -1,0 +1,10 @@
+# Copyright (c) 2026 shakushakupanda
+# SPDX-License-Identifier: MIT
+#
+# Generic one-param mouse-gesture set activation behavior.
+# Use &mg_set N in hand-written keymaps.
+
+description: Mouse gesture set activation behavior
+compatible: "zmk,behavior-mg-set"
+
+include: one_param.yaml
