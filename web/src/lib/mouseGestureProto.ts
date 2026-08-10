@@ -184,6 +184,12 @@ function encodeSettings(s: Settings): Uint8Array {
 }
 
 function decodeSettings(buf: Uint8Array): Settings {
+    // proto3 はゼロ値のフィールドをワイヤに載せないため、
+    // 「フィールドが無い」= 「ゼロ値」として初期化しなければならない。
+    // ここに 0 以外の初期値 (旧: inertialScrollEnabled=true, tickMs=20 …) を
+    // 置くと、ファームウェアが false / 0 を報告したときにフィールドが省略され、
+    // その初期値が残って UI に表示されてしまう。
+    // (慣性スクロールを無効にしても "Enabled" と表示される不具合の原因)
     const out: Settings = {
         strokeSize: 0,
         idleTimeoutMs: 0,
@@ -191,13 +197,13 @@ function decodeSettings(buf: Uint8Array): Settings {
         movementThreshold: 0,
         enableEagerMode: false,
         alwaysActive: false,
-        inertialScrollEnabled: true,
-        inertialScrollTickMs: 20,
-        inertialScrollIdleMs: 28,
-        inertialScrollDecayPercent: 86,
-        inertialScrollImpulsePercent: 180,
-        inertialScrollMinVelocityQ8: 96,
-        inertialScrollMaxTicks: 36,
+        inertialScrollEnabled: false,
+        inertialScrollTickMs: 0,
+        inertialScrollIdleMs: 0,
+        inertialScrollDecayPercent: 0,
+        inertialScrollImpulsePercent: 0,
+        inertialScrollMinVelocityQ8: 0,
+        inertialScrollMaxTicks: 0,
     };
     for (const f of walkFields(buf)) {
         if (f.field === 1 && f.value !== undefined) out.strokeSize = f.value;

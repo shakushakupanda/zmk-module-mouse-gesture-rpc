@@ -394,7 +394,7 @@ function normalizeImportedSettings(input: unknown): Settings {
         movementThreshold: Number(s.movementThreshold ?? 0),
         enableEagerMode: Boolean(s.enableEagerMode ?? false),
         alwaysActive: Boolean(s.alwaysActive ?? false),
-        inertialScrollEnabled: Boolean(s.inertialScrollEnabled ?? true),
+        inertialScrollEnabled: Boolean(s.inertialScrollEnabled ?? false),
         inertialScrollTickMs: Number(s.inertialScrollTickMs ?? 20),
         inertialScrollIdleMs: Number(s.inertialScrollIdleMs ?? 28),
         inertialScrollDecayPercent: Number(s.inertialScrollDecayPercent ?? 86),
