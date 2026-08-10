@@ -808,10 +808,18 @@ function NumberField({
     onChange: (v: number) => void;
 }) {
     const [text, setText] = useState(String(value));
+    const [editing, setEditing] = useState(false);
 
+    // Only re-sync the text box from the prop while the user is not typing in
+    // it. Syncing on every keystroke used to fight the caret: committing after
+    // each character rewrote `value`, the effect rewrote `text`, and the caret
+    // jumped back to the start -- so typing "20" over "2" produced "02" -> 2
+    // and the field looked stuck on the first digit typed.
     useEffect(() => {
-        setText(String(value));
-    }, [value]);
+        if (!editing) {
+            setText(String(value));
+        }
+    }, [value, editing]);
 
     const commit = (next: string) => {
         if (next.trim() === "") return;
@@ -829,13 +837,20 @@ function NumberField({
                 inputMode="numeric"
                 pattern="[0-9]*"
                 value={text}
+                onFocus={() => setEditing(true)}
                 onChange={(e) => {
                     const next = e.target.value;
                     if (!/^\d*$/.test(next)) return;
+                    // Keep the raw text while typing; commit on blur / Enter.
                     setText(next);
-                    commit(next);
+                }}
+                onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                        e.currentTarget.blur();
+                    }
                 }}
                 onBlur={() => {
+                    setEditing(false);
                     if (text.trim() === "") {
                         setText(String(value));
                     } else {
