@@ -108,7 +108,7 @@ static void inertial_scroll_work_cb(struct k_work *work) {
 
     if (scroll_x != 0 || scroll_y != 0) {
         zmk_hid_mouse_scroll_set(scroll_x, scroll_y);
-        zmk_endpoints_send_mouse_report();
+        zmk_endpoint_send_mouse_report();
         zmk_hid_mouse_scroll_set(0, 0);
     }
 
@@ -153,7 +153,9 @@ static int inertial_scroll_init(const struct device *dev) {
         g_inertial_scroll_data = data;
     }
     data->settings = (struct zmk_inertial_scroll_settings){
-        .enabled = true,
+        /* Default OFF: inertial scroll is opt-in from the Studio web UI.
+         * Once toggled there the choice is persisted and reloaded at boot. */
+        .enabled = false,
         .tick_ms = 20,
         .idle_ms = 28,
         .decay_percent = 86,

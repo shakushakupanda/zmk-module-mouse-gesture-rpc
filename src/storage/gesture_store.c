@@ -51,7 +51,7 @@ static struct mg_settings g_settings = {
     .enable_eager_mode   = false,
     .always_active       = false,
 
-    .inertial_scroll_enabled         = true,
+    .inertial_scroll_enabled         = false,
     .inertial_scroll_tick_ms         = 20,
     .inertial_scroll_idle_ms         = 28,
     .inertial_scroll_decay_percent   = 86,
