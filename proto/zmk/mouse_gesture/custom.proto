@@ -55,6 +55,9 @@ message Settings {
     uint32 inertial_scroll_impulse_percent = 11;
     uint32 inertial_scroll_min_velocity_q8 = 12;
     uint32 inertial_scroll_max_ticks = 13;
+    uint32 inertial_scroll_flick_window_ms = 14;
+    uint32 inertial_scroll_flick_min_counts = 15;
+    uint32 inertial_scroll_flick_max_gap_ms = 16;
 }
 
 // Phase 5 debug aid: each breadcrumb entry recorded by the firmware.
@@ -110,6 +113,7 @@ message Request {
         GetSettingsRequest get_settings = 7;
         SetSettingsRequest set_settings = 8;
         GetLogRequest get_log = 9;
+        ScrollCaptureRequest scroll_capture = 10;
     }
 }
 
@@ -121,6 +125,7 @@ message Response {
         Empty empty = 4;
         GetSettingsResponse settings = 5;
         GetLogResponse log = 6;
+        ScrollCaptureResponse scroll_capture = 7;
     }
 }
 
@@ -135,4 +140,12 @@ message GestureChangedNotification {
     ChangeType type = 1;
     Gesture gesture = 2;       // when ADDED/UPDATED
     uint32 deleted_id = 3;     // when DELETED
+}
+
+// Temporary RAM-only recording. Inertia is suspended for at most ten seconds.
+message ScrollCaptureRequest { uint32 action = 1; uint32 id = 2; uint32 offset = 3; }
+message ScrollSample { uint32 ts_ms = 1; uint32 amount = 2; bool negative = 3; uint32 axis = 4; }
+message ScrollCaptureResponse {
+    uint32 id = 1; uint32 total = 2; uint32 dropped = 3; bool active = 4;
+    repeated ScrollSample samples = 5;
 }
