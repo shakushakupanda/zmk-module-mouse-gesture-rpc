@@ -1,11 +1,21 @@
 # Copyright (c) 2026
 # SPDX-License-Identifier: MIT
 
-description: Input processor that adds decaying inertial scroll after wheel movement
+description: |
+  Smooth raw wheel movement and add flick-only inertia. Add a zmk,input-listener
+  whose device and input-processors both reference this processor node so timed
+  output runs on the input thread. input-divisor replaces upstream wheel scaling.
 
 compatible: "zmk,input-processor-inertial-scroll"
 
 properties:
+  input-divisor:
+    type: int
+    default: 1
+    description: Raw wheel counts per ordinary wheel step, before smoothing.
+  scroll-layers:
+    type: array
+    description: Layers that permit queued scroll output. Leaving all of them cancels motion.
   "#input-processor-cells":
     type: int
     required: true
