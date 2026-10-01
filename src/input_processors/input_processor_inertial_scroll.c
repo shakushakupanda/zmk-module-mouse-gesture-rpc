@@ -16,22 +16,11 @@
 #include <zmk/hid.h>
 
 #define Q_ONE 256
-#define WINDOW_MS 80
 #define BUCKET_MS 10
-#define BUCKETS 9
-#define MAX_GAP_MS 40
-#define FLICK_COUNTS 4
+#define BUCKETS 21
 #define MAX_VELOCITY_Q8 (4 * Q_ONE)
 
-struct zmk_inertial_scroll_settings {
-    bool enabled;
-    uint16_t tick_ms;
-    uint16_t idle_ms;
-    uint8_t decay_percent;
-    uint16_t impulse_percent;
-    uint16_t min_velocity_q8;
-    uint8_t max_ticks;
-};
+#include "inertial_scroll.h"
 
 struct scroll_axis {
     int64_t bucket_id[BUCKETS];
@@ -55,6 +44,46 @@ struct inertial_scroll_data {
 
 static struct inertial_scroll_data *g_inertial_scroll_data;
 
+/* Capture only physical, post-scaling wheel input; never synthesized inertia. */
+#define CAPTURE_SAMPLES 256
+static struct mg_scroll_sample capture_samples[CAPTURE_SAMPLES];
+static uint32_t capture_id, capture_count, capture_dropped;
+static int64_t capture_start, capture_end;
+
+int mg_scroll_capture_read(uint32_t action, uint32_t id, uint32_t offset,
+                           struct mg_scroll_capture *out) {
+    struct inertial_scroll_data *data = g_inertial_scroll_data;
+    if (!data) return -ENOTSUP;
+    if (!out || action > 2) return -EINVAL;
+    k_spinlock_key_t key = k_spin_lock(&data->lock);
+    int64_t now = k_uptime_get();
+    if (action == 1) {
+        capture_id++;
+        if (!capture_id) capture_id++;
+        capture_count = capture_dropped = 0;
+        capture_start = (now / BUCKET_MS) * BUCKET_MS;
+        capture_end = now + 10000;
+        memset(data->axis, 0, sizeof(data->axis));
+        data->coasting = false;
+        data->ticks = 0;
+        k_work_cancel_delayable(&data->work);
+    } else if (!id || id != capture_id) {
+        k_spin_unlock(&data->lock, key);
+        return -EINVAL;
+    }
+    if (action == 2) capture_end = 0;
+    memset(out, 0, sizeof(*out));
+    out->id = capture_id;
+    out->total = capture_count;
+    out->dropped = capture_dropped;
+    out->active = now < capture_end;
+    for (uint32_t i = offset; i < capture_count && out->count < 32; i++) {
+        out->samples[out->count++] = capture_samples[i];
+    }
+    k_spin_unlock(&data->lock, key);
+    return 0;
+}
+
 static int code_index(uint16_t code) {
     return code == INPUT_REL_WHEEL ? 0 : code == INPUT_REL_HWHEEL ? 1 : -1;
 }
@@ -69,9 +98,9 @@ static void clear_motion(struct inertial_scroll_data *data) {
     data->coasting = false;
 }
 
-static void add_sample(struct scroll_axis *axis, int32_t value, int64_t now) {
+static void add_sample(struct scroll_axis *axis, int32_t value, int64_t now, uint16_t max_gap_ms) {
     int direction = value < 0 ? -1 : 1;
-    if (axis->direction != direction || now - axis->last_ms > MAX_GAP_MS) {
+    if (axis->direction != direction || now - axis->last_ms > max_gap_ms) {
         memset(axis, 0, sizeof(*axis));
     }
     axis->direction = direction;
@@ -90,24 +119,24 @@ static void add_sample(struct scroll_axis *axis, int32_t value, int64_t now) {
 
 static int32_t flick_velocity(const struct scroll_axis *axis,
                               const struct zmk_inertial_scroll_settings *st, int64_t now) {
-    if (!axis->direction || now - axis->last_ms > MAX_GAP_MS) {
+    if (!axis->direction || now - axis->last_ms > st->flick_max_gap_ms) {
         return 0;
     }
     uint32_t count = 0, reports = 0;
     for (size_t i = 0; i < BUCKETS; i++) {
         /* Exclude the partially expired bucket instead of counting old input. */
         int64_t start = axis->bucket_id[i] * BUCKET_MS;
-        if (start >= now - WINDOW_MS && start <= now) {
+        if (start >= now - st->flick_window_ms && start <= now) {
             count += axis->counts[i];
             reports += axis->reports[i];
         }
     }
     /* A single isolated report never arms inertia, even if it is large. */
-    if (count < FLICK_COUNTS || reports < 2) {
+    if (count < st->flick_min_counts || reports < 2) {
         return 0;
     }
     uint64_t velocity = (uint64_t)count * st->tick_ms * Q_ONE * st->impulse_percent /
-                        (WINDOW_MS * 100U);
+                        (st->flick_window_ms * 100U);
     return axis->direction * (int32_t)MIN(velocity, MAX_VELOCITY_Q8);
 }
 
@@ -168,6 +197,17 @@ static int inertial_scroll_handle_event(const struct device *dev, struct input_e
     }
     struct inertial_scroll_data *data = dev->data;
     k_spinlock_key_t key = k_spin_lock(&data->lock);
+    int64_t capture_now = k_uptime_get();
+    if (capture_now < capture_end) {
+        if (capture_count < CAPTURE_SAMPLES) {
+            capture_samples[capture_count++] = (struct mg_scroll_sample){
+                .ts_ms = (uint32_t)(capture_now - capture_start),
+                .value = event->value, .axis = idx,
+            };
+        } else { capture_dropped++; }
+        k_spin_unlock(&data->lock, key);
+        return ZMK_INPUT_PROC_CONTINUE;
+    }
     if (!data->settings.enabled) {
         k_spin_unlock(&data->lock, key);
         return ZMK_INPUT_PROC_CONTINUE;
@@ -178,7 +218,7 @@ static int inertial_scroll_handle_event(const struct device *dev, struct input_e
         clear_motion(data);
     }
     int64_t now = k_uptime_get();
-    add_sample(&data->axis[idx], event->value, now);
+    add_sample(&data->axis[idx], event->value, now, data->settings.flick_max_gap_ms);
     data->ticks = 0;
     bool armed = false;
     for (size_t i = 0; i < 2; i++) {
@@ -188,7 +228,7 @@ static int inertial_scroll_handle_event(const struct device *dev, struct input_e
     }
     if (armed) {
         /* Do not start between the closely spaced reports of an ongoing flick. */
-        uint16_t delay = MAX(data->settings.idle_ms, MAX_GAP_MS);
+        uint16_t delay = MAX(data->settings.idle_ms, data->settings.flick_max_gap_ms);
         data->due_ms = now + delay;
         k_work_reschedule(&data->work, K_MSEC(delay));
     } else {
@@ -206,6 +246,7 @@ static int inertial_scroll_init(const struct device *dev) {
     data->settings = (struct zmk_inertial_scroll_settings){
         .enabled = false, .tick_ms = 20, .idle_ms = 28, .decay_percent = 86,
         .impulse_percent = 180, .min_velocity_q8 = 96, .max_ticks = 36,
+        .flick_window_ms = 80, .flick_min_counts = 4, .flick_max_gap_ms = 40,
     };
     k_work_init_delayable(&data->work, inertial_scroll_work_cb);
     return 0;
@@ -241,6 +282,9 @@ int zmk_inertial_scroll_runtime_set(const struct zmk_inertial_scroll_settings *s
     data->settings.tick_ms = MAX(settings->tick_ms, 1);
     data->settings.decay_percent = CLAMP(settings->decay_percent, 1, 99);
     data->settings.min_velocity_q8 = MAX(settings->min_velocity_q8, 1);
+    data->settings.flick_window_ms = CLAMP(settings->flick_window_ms ? settings->flick_window_ms : 80, 20, 200);
+    data->settings.flick_min_counts = CLAMP(settings->flick_min_counts ? settings->flick_min_counts : 4, 2, 64);
+    data->settings.flick_max_gap_ms = CLAMP(settings->flick_max_gap_ms ? settings->flick_max_gap_ms : 40, 10, 200);
     clear_motion(data);
     k_work_cancel_delayable(&data->work);
     k_spin_unlock(&data->lock, key);
