@@ -15,6 +15,8 @@ import {
     SubsystemInfo,
 } from "./studioEnvelope";
 import {
+    buildScrollCaptureRequest,
+    ScrollCapture,
     buildAddGestureRequest,
     buildDeleteGestureRequest,
     buildGetGestureRequest,
@@ -134,6 +136,12 @@ export class MouseGestureClient {
         const resp = await this.callRPC(buildSetSettingsRequest(s));
         if (resp.kind !== "settings") throw new Error(`Unexpected: ${resp.kind}`);
         return resp.settings;
+    }
+
+    async captureScroll(action: number, id = 0, offset = 0): Promise<ScrollCapture> {
+        const resp = await this.callRPC(buildScrollCaptureRequest(action, id, offset));
+        if (resp.kind !== "scrollCapture") throw new Error("This firmware does not support scroll calibration.");
+        return resp.capture;
     }
 
     async getLog(): Promise<LogEntry[]> {

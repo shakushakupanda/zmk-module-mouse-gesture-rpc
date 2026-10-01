@@ -9,7 +9,6 @@
 import {
     concat,
     encodeBoolField,
-    encodeBytesField,
     encodeMessageField,
     encodeStringField,
     encodeVarintField,
@@ -63,6 +62,9 @@ export interface Settings {
     inertialScrollImpulsePercent: number;
     inertialScrollMinVelocityQ8: number;
     inertialScrollMaxTicks: number;
+    inertialScrollFlickWindowMs: number;
+    inertialScrollFlickMinCounts: number;
+    inertialScrollFlickMaxGapMs: number;
 }
 
 export interface LogEntry {
@@ -180,6 +182,9 @@ function encodeSettings(s: Settings): Uint8Array {
     if (s.inertialScrollImpulsePercent !== 0) parts.push(encodeVarintField(11, s.inertialScrollImpulsePercent));
     if (s.inertialScrollMinVelocityQ8 !== 0) parts.push(encodeVarintField(12, s.inertialScrollMinVelocityQ8));
     if (s.inertialScrollMaxTicks !== 0) parts.push(encodeVarintField(13, s.inertialScrollMaxTicks));
+    if (s.inertialScrollFlickWindowMs) parts.push(encodeVarintField(14, s.inertialScrollFlickWindowMs));
+    if (s.inertialScrollFlickMinCounts) parts.push(encodeVarintField(15, s.inertialScrollFlickMinCounts));
+    if (s.inertialScrollFlickMaxGapMs) parts.push(encodeVarintField(16, s.inertialScrollFlickMaxGapMs));
     return concat(...parts);
 }
 
@@ -204,6 +209,9 @@ function decodeSettings(buf: Uint8Array): Settings {
         inertialScrollImpulsePercent: 0,
         inertialScrollMinVelocityQ8: 0,
         inertialScrollMaxTicks: 0,
+        inertialScrollFlickWindowMs: 0,
+        inertialScrollFlickMinCounts: 0,
+        inertialScrollFlickMaxGapMs: 0,
     };
     for (const f of walkFields(buf)) {
         if (f.field === 1 && f.value !== undefined) out.strokeSize = f.value;
@@ -219,6 +227,9 @@ function decodeSettings(buf: Uint8Array): Settings {
         else if (f.field === 11 && f.value !== undefined) out.inertialScrollImpulsePercent = f.value;
         else if (f.field === 12 && f.value !== undefined) out.inertialScrollMinVelocityQ8 = f.value;
         else if (f.field === 13 && f.value !== undefined) out.inertialScrollMaxTicks = f.value;
+        else if (f.field === 14 && f.value !== undefined) out.inertialScrollFlickWindowMs = f.value;
+        else if (f.field === 15 && f.value !== undefined) out.inertialScrollFlickMinCounts = f.value;
+        else if (f.field === 16 && f.value !== undefined) out.inertialScrollFlickMaxGapMs = f.value;
     }
     return out;
 }
@@ -307,10 +318,12 @@ export type Response =
     | { kind: "gesture"; gesture: Gesture }
     | { kind: "empty" }
     | { kind: "settings"; settings: Settings }
-    | { kind: "log"; entries: LogEntry[] };
+    | { kind: "log"; entries: LogEntry[] }
+    | { kind: "scrollCapture"; capture: ScrollCapture };
 
 export function parseResponse(buf: Uint8Array): Response {
     for (const f of walkFields(buf)) {
+        if (f.field === 7) return { kind: "scrollCapture", capture: decodeCapture(f.raw) };
         if (f.field === RESP_ERROR) {
             let message = "";
             for (const f2 of walkFields(f.raw)) {
@@ -343,14 +356,7 @@ export function parseResponse(buf: Uint8Array): Response {
             return { kind: "empty" };
         }
         if (f.field === RESP_SETTINGS) {
-            let s: Settings = {
-                strokeSize: 0,
-                idleTimeoutMs: 0,
-                gestureCooldownMs: 0,
-                movementThreshold: 0,
-                enableEagerMode: false,
-                alwaysActive: false,
-            };
+            let s = decodeSettings(new Uint8Array(0));
             for (const f2 of walkFields(f.raw)) {
                 if (f2.field === 1) s = decodeSettings(f2.raw);
             }
@@ -365,4 +371,32 @@ export function parseResponse(buf: Uint8Array): Response {
         }
     }
     throw new Error("Response had no recognized response_type oneof variant");
+}
+
+export interface ScrollSample { tsMs: number; amount: number; negative: boolean; axis: number }
+export interface ScrollCapture { id: number; total: number; dropped: number; active: boolean; samples: ScrollSample[] }
+export function buildScrollCaptureRequest(action: number, id = 0, offset = 0): Uint8Array {
+    return encodeMessageField(10, concat(
+        encodeVarintField(1, action), encodeVarintField(2, id), encodeVarintField(3, offset),
+    ));
+}
+function decodeCapture(buf: Uint8Array): ScrollCapture {
+    const out: ScrollCapture = { id: 0, total: 0, dropped: 0, active: false, samples: [] };
+    for (const f of walkFields(buf)) {
+        if (f.field === 1) out.id = f.value ?? 0;
+        if (f.field === 2) out.total = f.value ?? 0;
+        if (f.field === 3) out.dropped = f.value ?? 0;
+        if (f.field === 4) out.active = !!f.value;
+        if (f.field === 5) {
+            const sample: ScrollSample = { tsMs: 0, amount: 0, negative: false, axis: 0 };
+            for (const v of walkFields(f.raw)) {
+                if (v.field === 1) sample.tsMs = v.value ?? 0;
+                if (v.field === 2) sample.amount = v.value ?? 0;
+                if (v.field === 3) sample.negative = !!v.value;
+                if (v.field === 4) sample.axis = v.value ?? 0;
+            }
+            out.samples.push(sample);
+        }
+    }
+    return out;
 }

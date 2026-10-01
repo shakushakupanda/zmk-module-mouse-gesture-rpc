@@ -101,7 +101,7 @@ export interface CallResponse {
 
 export function parseCallResponse(payload: Uint8Array): CallResponse {
     let idx = 0;
-    let inner = new Uint8Array(0);
+    let inner: Uint8Array = new Uint8Array(0);
     for (const f of walkFields(payload)) {
         if (f.field === 1 && f.value !== undefined) idx = f.value;
         else if (f.field === 2) inner = f.raw;
