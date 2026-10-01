@@ -105,6 +105,9 @@ struct mg_settings {
     uint32_t inertial_scroll_impulse_percent;
     uint32_t inertial_scroll_min_velocity_q8;
     uint32_t inertial_scroll_max_ticks;
+    uint32_t inertial_scroll_flick_window_ms;
+    uint32_t inertial_scroll_flick_min_counts;
+    uint32_t inertial_scroll_flick_max_gap_ms;
 };
 
 /* Read the current settings (post-NVS-load) into *out. */

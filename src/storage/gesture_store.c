@@ -58,17 +58,12 @@ static struct mg_settings g_settings = {
     .inertial_scroll_impulse_percent = 180,
     .inertial_scroll_min_velocity_q8 = 96,
     .inertial_scroll_max_ticks       = 36,
+    .inertial_scroll_flick_window_ms = 80,
+    .inertial_scroll_flick_min_counts = 4,
+    .inertial_scroll_flick_max_gap_ms = 40,
 };
 
-struct zmk_inertial_scroll_settings {
-    bool enabled;
-    uint16_t tick_ms;
-    uint16_t idle_ms;
-    uint8_t decay_percent;
-    uint16_t impulse_percent;
-    uint16_t min_velocity_q8;
-    uint8_t max_ticks;
-};
+#include "../input_processors/inertial_scroll.h"
 
 __weak int zmk_inertial_scroll_runtime_set(const struct zmk_inertial_scroll_settings *settings) {
     ARG_UNUSED(settings);
@@ -84,6 +79,9 @@ static void apply_inertial_scroll_settings(void) {
         .impulse_percent = CLAMP(g_settings.inertial_scroll_impulse_percent, 0, UINT16_MAX),
         .min_velocity_q8 = CLAMP(g_settings.inertial_scroll_min_velocity_q8, 1, UINT16_MAX),
         .max_ticks = CLAMP(g_settings.inertial_scroll_max_ticks, 0, UINT8_MAX),
+        .flick_window_ms = g_settings.inertial_scroll_flick_window_ms,
+        .flick_min_counts = g_settings.inertial_scroll_flick_min_counts,
+        .flick_max_gap_ms = g_settings.inertial_scroll_flick_max_gap_ms,
     };
     int rc = zmk_inertial_scroll_runtime_set(&s);
     if (rc && rc != -ENOTSUP && rc != -ENODEV) {
@@ -542,7 +540,12 @@ void mg_settings_get(struct mg_settings *out) {
 
 int mg_settings_set(const struct mg_settings *s) {
     if (!s) return -EINVAL;
-    g_settings = *s;
+    struct mg_settings next = *s;
+    /* Missing fields from an older Studio client preserve the current values. */
+    next.inertial_scroll_flick_window_ms = CLAMP(next.inertial_scroll_flick_window_ms ? next.inertial_scroll_flick_window_ms : g_settings.inertial_scroll_flick_window_ms, 20, 200);
+    next.inertial_scroll_flick_min_counts = CLAMP(next.inertial_scroll_flick_min_counts ? next.inertial_scroll_flick_min_counts : g_settings.inertial_scroll_flick_min_counts, 2, 64);
+    next.inertial_scroll_flick_max_gap_ms = CLAMP(next.inertial_scroll_flick_max_gap_ms ? next.inertial_scroll_flick_max_gap_ms : g_settings.inertial_scroll_flick_max_gap_ms, 10, 200);
+    g_settings = next;
     int rc = settings_save_one("cmg/settings", &g_settings, sizeof(g_settings));
     if (rc) {
         LOG_WRN("mg_store: save settings failed: %d", rc);
