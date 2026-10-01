@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import "./App.css";
+import { FlickCalibration } from "./FlickCalibration";
 import { MouseGestureClient } from "./lib/mouseGestureClient";
 import {
     Direction,
@@ -300,7 +301,7 @@ function App() {
                     </section>
 
                     {data.settings && (
-                        <SettingsCard settings={data.settings} onSave={onSetSettings} disabled={busy} />
+                        <SettingsCard settings={data.settings} onSave={onSetSettings} disabled={busy} client={conn.client} onBusy={setBusy} />
                     )}
 
                     <section className="card">
@@ -401,6 +402,9 @@ function normalizeImportedSettings(input: unknown): Settings {
         inertialScrollImpulsePercent: Number(s.inertialScrollImpulsePercent ?? 180),
         inertialScrollMinVelocityQ8: Number(s.inertialScrollMinVelocityQ8 ?? 96),
         inertialScrollMaxTicks: Number(s.inertialScrollMaxTicks ?? 36),
+        inertialScrollFlickWindowMs: Number(s.inertialScrollFlickWindowMs || 80),
+        inertialScrollFlickMinCounts: Number(s.inertialScrollFlickMinCounts || 4),
+        inertialScrollFlickMaxGapMs: Number(s.inertialScrollFlickMaxGapMs || 40),
     };
 }
 
@@ -695,10 +699,13 @@ function describeZmkUsage(value: number): string | null {
 }
 
 function SettingsCard({
+    client, onBusy,
     settings,
     onSave,
     disabled,
 }: {
+    client: MouseGestureClient;
+    onBusy: (busy: boolean) => void;
     settings: Settings;
     onSave: (s: Settings) => void;
     disabled: boolean;
@@ -791,6 +798,20 @@ function SettingsCard({
                     onChange={(v) => setDraft({ ...draft, inertialScrollMaxTicks: v })}
                 />
             </div>
+            <fieldset disabled={disabled || !settings.inertialScrollFlickWindowMs} style={{ border: 0, padding: 0 }}>
+            <h3 className="settings-subhead">Flick detection</h3>
+            <div className="settings-grid">
+                <NumberField label="Detection window (20–200 ms)" value={draft.inertialScrollFlickWindowMs}
+                    onChange={(v) => setDraft({ ...draft, inertialScrollFlickWindowMs: Math.min(200, Math.max(20, v)) })} />
+                <NumberField label="Minimum scroll steps (2–64)" value={draft.inertialScrollFlickMinCounts}
+                    onChange={(v) => setDraft({ ...draft, inertialScrollFlickMinCounts: Math.min(64, Math.max(2, v)) })} />
+                <NumberField label="Maximum input gap (10–200 ms)" value={draft.inertialScrollFlickMaxGapMs}
+                    onChange={(v) => setDraft({ ...draft, inertialScrollFlickMaxGapMs: Math.min(200, Math.max(10, v)) })} />
+            </div>
+            </fieldset>
+            {!settings.inertialScrollFlickWindowMs && <p className="muted">判定条件の調整・自動測定には対応ファームウェアへの更新が必要です。</p>}
+            {settings.inertialScrollFlickWindowMs > 0 && <FlickCalibration client={client} settings={draft} disabled={disabled} onBusy={onBusy} onApply={(p) => setDraft({ ...draft, ...p })} />}
+            <p className="muted">More steps or a shorter window makes flicks harder to trigger. A shorter input gap rejects slower movement. Defaults: 80 ms / 4 steps / 40 ms. At least two input reports are required. Start delay is never shorter than the maximum input gap.</p>
             <p className="muted" style={{ marginTop: 12 }}>
                 Lower decay stops sooner. Higher impulse carries the scroll farther. Set Inertial scroll off to disable it completely.
             </p>
