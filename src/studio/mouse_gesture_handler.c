@@ -20,6 +20,7 @@
 
 #include "../storage/gesture_store.h"
 #include "../storage/log_ring.h"
+#include "../input_processors/inertial_scroll.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
@@ -241,6 +242,9 @@ static int handle_get_settings(
     out.settings.inertial_scroll_impulse_percent = cur.inertial_scroll_impulse_percent;
     out.settings.inertial_scroll_min_velocity_q8 = cur.inertial_scroll_min_velocity_q8;
     out.settings.inertial_scroll_max_ticks = cur.inertial_scroll_max_ticks;
+    out.settings.inertial_scroll_flick_window_ms = cur.inertial_scroll_flick_window_ms;
+    out.settings.inertial_scroll_flick_min_counts = cur.inertial_scroll_flick_min_counts;
+    out.settings.inertial_scroll_flick_max_gap_ms = cur.inertial_scroll_flick_max_gap_ms;
     resp->which_response_type = zmk_mouse_gesture_Response_settings_tag;
     resp->response_type.settings = out;
     return 0;
@@ -267,6 +271,9 @@ static int handle_set_settings(
         .inertial_scroll_impulse_percent = req->settings.inertial_scroll_impulse_percent,
         .inertial_scroll_min_velocity_q8 = req->settings.inertial_scroll_min_velocity_q8,
         .inertial_scroll_max_ticks = req->settings.inertial_scroll_max_ticks,
+        .inertial_scroll_flick_window_ms = req->settings.inertial_scroll_flick_window_ms,
+        .inertial_scroll_flick_min_counts = req->settings.inertial_scroll_flick_min_counts,
+        .inertial_scroll_flick_max_gap_ms = req->settings.inertial_scroll_flick_max_gap_ms,
     };
     int rc = mg_settings_set(&ns);
     if (rc) { set_error(resp, "set_settings failed"); return 0; }
@@ -292,6 +299,34 @@ static int handle_get_log(
     }
     resp->which_response_type = zmk_mouse_gesture_Response_log_tag;
     resp->response_type.log = out;
+    return 0;
+}
+
+__weak int mg_scroll_capture_read(uint32_t action, uint32_t id, uint32_t offset,
+                                  struct mg_scroll_capture *out) {
+    ARG_UNUSED(action); ARG_UNUSED(id); ARG_UNUSED(offset); ARG_UNUSED(out);
+    return -ENOTSUP;
+}
+
+static int handle_scroll_capture(const zmk_mouse_gesture_ScrollCaptureRequest *req,
+                                 zmk_mouse_gesture_Response *resp) {
+    /* Static: avoid adding the sample buffer to the Studio thread stack. */
+    static struct mg_scroll_capture capture;
+    int rc = mg_scroll_capture_read(req->action, req->id, req->offset, &capture);
+    if (rc) { set_error(resp, "Scroll capture unavailable or expired"); return 0; }
+    resp->which_response_type = zmk_mouse_gesture_Response_scroll_capture_tag;
+    zmk_mouse_gesture_ScrollCaptureResponse *out = &resp->response_type.scroll_capture;
+    *out = (zmk_mouse_gesture_ScrollCaptureResponse)zmk_mouse_gesture_ScrollCaptureResponse_init_zero;
+    out->id = capture.id; out->total = capture.total;
+    out->active = capture.active; out->dropped = capture.dropped;
+    out->samples_count = capture.count;
+    for (size_t i = 0; i < capture.count; i++) {
+        out->samples[i].ts_ms = capture.samples[i].ts_ms;
+        int32_t v = capture.samples[i].value;
+        out->samples[i].amount = v < 0 ? (uint32_t)(-(int64_t)v) : (uint32_t)v;
+        out->samples[i].negative = v < 0;
+        out->samples[i].axis = capture.samples[i].axis;
+    }
     return 0;
 }
 
@@ -321,6 +356,8 @@ static bool mouse_gesture_rpc_handle_request(
     int rc = 0;
     mg_log_push(MG_LOG_RPC_DISPATCH, req.which_request_type, 0);
     switch (req.which_request_type) {
+    case zmk_mouse_gesture_Request_scroll_capture_tag:
+        rc = handle_scroll_capture(&req.request_type.scroll_capture, resp); break;
     case zmk_mouse_gesture_Request_list_gestures_tag:
         rc = handle_list_gestures(&req.request_type.list_gestures, resp); break;
     case zmk_mouse_gesture_Request_get_gesture_tag:
